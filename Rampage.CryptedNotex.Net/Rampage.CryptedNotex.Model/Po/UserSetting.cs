@@ -31,7 +31,7 @@ namespace Rampage.CryptedNotex.Model.Po
         /// 自动锁定分钟数(0=不锁定)；数据库默认值：10
         /// </summary>
         [FieldMapping(ColumnName = "auto_lock_minutes")]
-        public int AutoLockMinutes { get; set; }
+        public int AutoLockMinutes { get; set; } = 10;
 
         /// <summary>
         /// 纯文本/Markdown 编辑器字体族；数据库默认值：Consolas
@@ -42,8 +42,9 @@ namespace Rampage.CryptedNotex.Model.Po
         /// <summary>
         /// 纯文本/Markdown 编辑器字号；数据库默认值：12
         /// </summary>
+        /// <remarks>属性默认值须与数据库列默认值一致：ORM 插入时会带上属性值,若此处缺省为 0 会覆盖列默认值并导致 Font 构造异常。</remarks>
         [FieldMapping(ColumnName = "editor_font_size")]
-        public double EditorFontSize { get; set; }
+        public double EditorFontSize { get; set; } = 12;
 
         /// <summary>
         /// 上次打开的笔记 id(0=无,登录后恢复)；数据库默认值：0

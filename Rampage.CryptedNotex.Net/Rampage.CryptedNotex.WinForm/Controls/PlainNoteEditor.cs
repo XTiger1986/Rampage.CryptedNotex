@@ -59,7 +59,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// <inheritdoc />
         public override void SetEditorFont(string family, double size)
         {
-            _textBox.Font = new Font(family, (float)size);
+            _textBox.Font = CreateSafeEditorFont(family, size);
         }
 
         /// <summary>

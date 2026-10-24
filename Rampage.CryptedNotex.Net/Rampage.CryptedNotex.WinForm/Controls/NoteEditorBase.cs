@@ -1,5 +1,6 @@
 using Rampage.CryptedNotex.Model.Dto;
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
 
@@ -84,6 +85,28 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             if (Current != null)
             {
                 MarkDirty();
+            }
+        }
+
+        /// <summary>
+        /// 按用户偏好安全构造编辑器字体：钳制字号到 [6,72] 并对非法/未安装字体族回退 Consolas
+        /// (防御历史脏数据,如 editor_font_size=0 会使 Font 构造直接抛异常)
+        /// </summary>
+        /// <param name="family">字体族(可空/未安装时回退)</param>
+        /// <param name="size">字号(超范围时回退 12)</param>
+        /// <returns>可安全使用的字体</returns>
+        protected static Font CreateSafeEditorFont(string? family, double size)
+        {
+            float safeSize = size < 6 || size > 72 ? 12F : (float)size;
+            string safeFamily = string.IsNullOrWhiteSpace(family) ? "Consolas" : family;
+            try
+            {
+                return new Font(safeFamily, safeSize);
+            }
+            catch (ArgumentException)
+            {
+                // 字体族未安装等情形
+                return new Font("Consolas", safeSize);
             }
         }
 
