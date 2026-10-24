@@ -1,0 +1,32 @@
+{
+  "id": "darkstar",
+  "name": "暗星",
+  "darkTitleBar": true,
+  "chrome": { "metal": "black", "wallpaper": "darkstar", "glow": "#FF2A3A" },
+  "colors": {
+    "windowBack": "#10080A",
+    "panelBack": "#1A1012",
+    "panelAltBack": "#140C0E",
+    "border": "#3A2428",
+    "inputBack": "#120C0E",
+    "inputBorder": "#4A3034",
+    "text": "#F3E8EA",
+    "textSecondary": "#B08990",
+    "accent": "#E23B4A",
+    "accentText": "#1A0608",
+    "selectionBack": "#3A1218",
+    "pinnedMark": "#E0B15A",
+    "trashTint": "#E08A8A",
+    "warning": "#E0B15A",
+    "danger": "#FF4D4D",
+    "link": "#FF8A8A",
+    "editorBack": "#120C0E",
+    "editorText": "#F3E8EA",
+    "previewBack": "#120C0E"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#E23B4A", "#C46B2F", "#A33A5A", "#D4A017", "#8A3040", "#E07A5A", "#6A3038", "#F07070" ]
+}

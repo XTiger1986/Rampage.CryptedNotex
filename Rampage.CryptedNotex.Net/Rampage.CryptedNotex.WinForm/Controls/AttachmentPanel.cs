@@ -1,4 +1,5 @@
 using Rampage.CryptedNotex.Model.Po;
+using Rampage.CryptedNotex.WinForm.Internal.Themes;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -60,7 +61,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
 
             Button addButton = new Button
             {
-                Text = "＋ 附件",
+                Text = "添加附件",
                 AutoSize = true,
                 Margin = new Padding(2, 4, 4, 4)
             };
@@ -84,6 +85,10 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 _flowPanel.Controls.Add(BuildChip(attachment));
             }
             _flowPanel.ResumeLayout();
+            if (IsHandleCreated)
+            {
+                ThemeManager.Apply(this);
+            }
         }
 
         /// <summary>
@@ -103,7 +108,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             string sizeText = FormatSize(attachment.FileSize);
             Label nameLabel = new Label
             {
-                Text = IconForMime(attachment.MimeType) + " " + attachment.FileName + " (" + sizeText + ")",
+                Text = attachment.FileName + " (" + sizeText + ")",
                 AutoSize = true,
                 Location = new Point(8, 6)
             };
@@ -121,30 +126,6 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             chip.Controls.Add(removeButton);
             chip.Width = removeButton.Right + 4;
             return chip;
-        }
-
-        /// <summary>
-        /// 按 MIME 类型取图标字符
-        /// </summary>
-        private static string IconForMime(string mimeType)
-        {
-            if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "🖼";
-            }
-            if (mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "📄";
-            }
-            if (mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "🎵";
-            }
-            if (mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "🎬";
-            }
-            return "📦";
         }
 
         /// <summary>

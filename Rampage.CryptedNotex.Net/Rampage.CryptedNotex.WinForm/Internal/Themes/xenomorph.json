@@ -1,0 +1,32 @@
+{
+  "id": "xenomorph",
+  "name": "异形",
+  "darkTitleBar": true,
+  "chrome": { "metal": "black", "wallpaper": "xenomorph", "glow": "#3EC6FF" },
+  "colors": {
+    "windowBack": "#071018",
+    "panelBack": "#121A24",
+    "panelAltBack": "#0C141E",
+    "border": "#2A3C52",
+    "inputBack": "#0E1622",
+    "inputBorder": "#314558",
+    "text": "#E6EEF8",
+    "textSecondary": "#8AA0B8",
+    "accent": "#3EC6FF",
+    "accentText": "#041018",
+    "selectionBack": "#123044",
+    "pinnedMark": "#E6C36A",
+    "trashTint": "#E09A9A",
+    "warning": "#E0B15A",
+    "danger": "#F05252",
+    "link": "#7FD4FF",
+    "editorBack": "#0B121C",
+    "editorText": "#E6EEF8",
+    "previewBack": "#0B121C"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#3EC6FF", "#7AA2FF", "#3DDC97", "#E6C36A", "#A78BFA", "#5EEAD4", "#94A3B8", "#38BDF8" ]
+}

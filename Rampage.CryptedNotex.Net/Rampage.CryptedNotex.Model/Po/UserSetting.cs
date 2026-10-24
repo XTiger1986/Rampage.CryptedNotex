@@ -22,10 +22,10 @@ namespace Rampage.CryptedNotex.Model.Po
         public int UserId { get; set; }
 
         /// <summary>
-        /// 主题 id(内嵌或自定义主题的 id,如 light/dark/forest/parchment/violet/contrast)；数据库默认值：light
+        /// 主题 id(内嵌或自定义主题的 id)。新用户代码初值为 xenomorph；已有行保持库中的值。历史 SQL 列默认仍是 light。
         /// </summary>
         [FieldMapping(ColumnName = "theme_id")]
-        public string ThemeId { get; set; } = "light";
+        public string ThemeId { get; set; } = "xenomorph";
 
         /// <summary>
         /// 自动锁定分钟数(0=不锁定)；数据库默认值：10

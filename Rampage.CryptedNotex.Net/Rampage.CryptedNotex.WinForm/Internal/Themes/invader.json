@@ -1,0 +1,32 @@
+{
+  "id": "invader",
+  "name": "入侵者",
+  "darkTitleBar": false,
+  "chrome": { "metal": "silver", "wallpaper": "invader", "glow": "#14D0EA" },
+  "colors": {
+    "windowBack": "#D5DCE4",
+    "panelBack": "#E7EDF2",
+    "panelAltBack": "#F7F9FB",
+    "border": "#B4BEC8",
+    "inputBack": "#FFFFFF",
+    "inputBorder": "#C5CED6",
+    "text": "#1B2430",
+    "textSecondary": "#5E6B7A",
+    "accent": "#0AA8C4",
+    "accentText": "#FFFFFF",
+    "selectionBack": "#D5F4FA",
+    "pinnedMark": "#A07800",
+    "trashTint": "#A15A5A",
+    "warning": "#8A6416",
+    "danger": "#C62828",
+    "link": "#087A96",
+    "editorBack": "#FFFFFF",
+    "editorText": "#1B2430",
+    "previewBack": "#FFFFFF"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#0AA8C4", "#3D7EA6", "#C4A35A", "#5C6B7A", "#1A8A7A", "#8A5A7A", "#4A6FA5", "#B06A3A" ]
+}

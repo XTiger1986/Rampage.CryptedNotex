@@ -63,11 +63,11 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _themeGallery = new FlowLayoutPanel
             {
                 Location = new Point(16, y),
-                Size = new Size(448, 130),
+                Size = new Size(448, 180),
                 AutoScroll = true
             };
             Controls.Add(_themeGallery);
-            y += 140;
+            y += 190;
 
             y = AddSection("自动锁定(分钟,0=不锁定)", y);
             _lockMinutesBox = new NumericUpDown
@@ -204,8 +204,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 ThemeCard card = new ThemeCard(theme)
                 {
-                    Margin = new Padding(0, 0, 10, 6),
-                    Size = new Size(200, 52),
+                    Margin = new Padding(0, 0, 10, 8),
+                    Size = new Size(210, 68),
                     Selected = theme.Id == ThemeManager.Current.Id
                 };
                 card.CardClicked += (sender, themeId) =>
@@ -289,16 +289,31 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 string windowBack = _theme.Colors.TryGetValue("windowBack", out string? wb) ? wb : "#FFFFFF";
                 string accent = _theme.Colors.TryGetValue("accent", out string? ac) ? ac : "#007ACC";
                 string text = _theme.Colors.TryGetValue("text", out string? tx) ? tx : "#202226";
+                string glow = _theme.Chrome != null && !string.IsNullOrWhiteSpace(_theme.Chrome.Glow) ? _theme.Chrome.Glow : accent;
+                Color backColor = ColorTranslator.FromHtml(windowBack);
+                Color accentColor = ColorTranslator.FromHtml(accent);
+                Color textColor = ColorTranslator.FromHtml(text);
+                Color glowColor = ColorTranslator.FromHtml(glow);
 
-                using (SolidBrush backBrush = new SolidBrush(ColorTranslator.FromHtml(windowBack)))
-                using (SolidBrush accentBrush = new SolidBrush(ColorTranslator.FromHtml(accent)))
-                using (SolidBrush textBrush = new SolidBrush(ColorTranslator.FromHtml(text)))
-                using (Pen borderPen = new Pen(_selected ? ColorTranslator.FromHtml(accent) : SystemColors.ControlDark, _selected ? 2F : 1F))
+                using (SolidBrush backBrush = new SolidBrush(backColor))
+                using (SolidBrush accentBrush = new SolidBrush(accentColor))
+                using (SolidBrush textBrush = new SolidBrush(textColor))
+                using (Pen borderPen = new Pen(_selected ? glowColor : SystemColors.ControlDark, _selected ? 2F : 1F))
+                using (Font font = new Font("Microsoft YaHei UI", 9.5F))
                 {
                     g.FillRectangle(backBrush, ClientRectangle);
+                    Image? wallpaper = _theme.Chrome == null ? null : ChromeAssets.GetWallpaper(_theme.Chrome.Wallpaper);
+                    if (wallpaper != null)
+                    {
+                        g.DrawImage(wallpaper, new Rectangle(1, 1, Width - 2, 26));
+                    }
+                    else
+                    {
+                        g.FillRectangle(accentBrush, new Rectangle(1, 1, Width - 2, 8));
+                    }
                     g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
-                    g.FillRectangle(accentBrush, new Rectangle(8, 8, 22, 22));
-                    g.DrawString(_theme.Name, new Font("Microsoft YaHei UI", 10F), textBrush, new PointF(40, 12));
+                    g.FillRectangle(accentBrush, new Rectangle(8, 36, 18, 18));
+                    g.DrawString(_theme.Name, font, textBrush, new PointF(34, 36));
                 }
             }
 

@@ -1,6 +1,7 @@
 using Rampage.CryptedNotex.BLL;
 using Rampage.CryptedNotex.Model.Dto;
 using Rampage.CryptedNotex.WinForm.Internal;
+using Rampage.CryptedNotex.WinForm.Internal.Themes;
 using Rampage.Security;
 using System;
 using System.Collections.Generic;
@@ -34,8 +35,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         public LoginForm(IRampageApplication app, CryptoSession session) : base(app)
         {
             _session = session;
-            Text = "加密笔记本 · 登录";
-            ClientSize = new Size(380, 440);
+            Text = NotexBrand.DisplayName + " · 登录";
+            Tag = "theme:wallpaper";
+            ClientSize = new Size(560, 640);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -43,72 +45,84 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 构建界面
+        /// 构建壁纸底上的金属登录卡片
         /// </summary>
         private void BuildUi()
         {
+            Panel card = new Panel
+            {
+                Size = new Size(440, 560),
+                Location = new Point(60, 40),
+                Tag = "theme:cardEmblem"
+            };
+            Controls.Add(card);
+
             Label titleLabel = new Label
             {
-                Text = "🔐 加密笔记本",
-                Font = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold),
+                Text = NotexBrand.DisplayName,
+                Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(20, 18)
+                Location = new Point(28, 118)
             };
-            Controls.Add(titleLabel);
+            card.Controls.Add(titleLabel);
 
             Label userLabel = new Label
             {
                 Text = "选择用户",
                 AutoSize = true,
-                Location = new Point(20, 64)
+                Location = new Point(28, 162)
             };
-            Controls.Add(userLabel);
+            card.Controls.Add(userLabel);
 
             _userList = new ListBox
             {
-                Location = new Point(20, 86),
-                Size = new Size(340, 160),
-                ItemHeight = 28,
+                Location = new Point(28, 186),
+                Size = new Size(384, 160),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 32,
                 Font = new Font("Microsoft YaHei UI", 10F),
-                HorizontalScrollbar = false
+                BorderStyle = BorderStyle.FixedSingle,
+                IntegralHeight = false
             };
+            _userList.DrawItem += UserListDrawItem;
             _userList.SelectedIndexChanged += (sender, e) => _passwordBox.Focus();
-            Controls.Add(_userList);
+            card.Controls.Add(_userList);
 
             Label passwordLabel = new Label
             {
                 Text = "密码",
                 AutoSize = true,
-                Location = new Point(20, 262)
+                Location = new Point(28, 358)
             };
-            Controls.Add(passwordLabel);
+            card.Controls.Add(passwordLabel);
 
             _passwordBox = new TextBox
             {
-                Location = new Point(20, 284),
-                Size = new Size(340, 28),
+                Location = new Point(28, 380),
+                Size = new Size(384, 28),
                 Font = new Font("Microsoft YaHei UI", 10.5F),
-                UseSystemPasswordChar = true
+                UseSystemPasswordChar = true,
+                BorderStyle = BorderStyle.FixedSingle
             };
             _passwordBox.KeyDown += PasswordBoxKeyDown;
-            Controls.Add(_passwordBox);
+            card.Controls.Add(_passwordBox);
 
             _loginButton = new Button
             {
                 Text = "登录",
                 Tag = "theme:accent",
-                Location = new Point(20, 328),
-                Size = new Size(160, 34),
+                Location = new Point(28, 424),
+                Size = new Size(184, 36),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
             _loginButton.Click += (sender, e) => AttemptLogin();
-            Controls.Add(_loginButton);
+            card.Controls.Add(_loginButton);
 
             _exitButton = new Button
             {
                 Text = "退出",
-                Location = new Point(200, 328),
-                Size = new Size(160, 34),
+                Location = new Point(228, 424),
+                Size = new Size(184, 36),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
             _exitButton.Click += (sender, e) =>
@@ -116,16 +130,17 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 DialogResult = DialogResult.Cancel;
                 Close();
             };
-            Controls.Add(_exitButton);
+            card.Controls.Add(_exitButton);
 
             _hintLabel = new Label
             {
                 Text = "忘记密码 = 数据无法恢复(无后门)",
                 Tag = "theme:muted",
                 AutoSize = true,
-                Location = new Point(20, 376)
+                MaximumSize = new Size(384, 0),
+                Location = new Point(28, 476)
             };
-            Controls.Add(_hintLabel);
+            card.Controls.Add(_hintLabel);
 
             _countdownTimer = new Timer
             {
@@ -135,6 +150,43 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _userList.SelectedIndexChanged += (sender, e) => RefreshBlockState();
             _passwordBox.TextChanged += (sender, e) => _hintLabel.Text = "忘记密码 = 数据无法恢复(无后门)";
+        }
+
+        /// <summary>
+        /// 用户列表自绘，行高与主题色一致
+        /// </summary>
+        private void UserListDrawItem(object? sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0)
+            {
+                return;
+            }
+
+            bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            Color back = selected ? ThemeManager.GetColor("selectionBack") : ThemeManager.GetColor("inputBack");
+            Color fore = ThemeManager.GetColor("text");
+            using (SolidBrush brush = new SolidBrush(back))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            string text = _userList.Items[e.Index]?.ToString() ?? string.Empty;
+            Rectangle textRect = new Rectangle(e.Bounds.X + 8, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
+            TextRenderer.DrawText(
+                e.Graphics,
+                text,
+                e.Font ?? _userList.Font,
+                textRect,
+                fore,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+
+        /// <summary>
+        /// 句柄创建后的缩放可能改掉构造时的客户区，这里再钉一次
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ClientSize = new Size(560, 640);
         }
 
         /// <summary>
@@ -258,7 +310,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             try
             {
                 Model.Po.UserSetting setting = GetService<IUserSettingService>().GetUserSetting(userId);
-                Internal.Themes.ThemeManager.ApplyTheme(setting.ThemeId);
+                ThemeManager.ApplyTheme(setting.ThemeId);
             }
             catch
             {

@@ -160,14 +160,18 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 return;
             }
 
+            Color parentBack = root is Form || root.Parent == null
+                ? GetColor("windowBack")
+                : root.Parent.BackColor;
             root.SuspendLayout();
             try
             {
-                ApplyCore(root, GetColor("windowBack"));
+                ApplyCore(root, parentBack);
+                ChromePainter.RefreshTree(root);
             }
             finally
             {
-                root.ResumeLayout();
+                root.ResumeLayout(true);
             }
         }
 
@@ -187,10 +191,16 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 form.ForeColor = text;
                 ApplyTitleBar(form);
             }
-            else if (control is TextBox || control is RichTextBox)
+            else if (control is TextBox textBox)
             {
-                control.BackColor = GetColor("inputBack");
-                control.ForeColor = text;
+                textBox.BorderStyle = BorderStyle.FixedSingle;
+                textBox.BackColor = GetColor("inputBack");
+                textBox.ForeColor = text;
+            }
+            else if (control is RichTextBox)
+            {
+                control.BackColor = GetColor("editorBack");
+                control.ForeColor = GetColor("editorText");
             }
             else if (control is Button button)
             {
@@ -205,7 +215,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 else if (tag == "theme:danger")
                 {
                     button.BackColor = GetColor("danger");
-                    button.ForeColor = GetColor("accentText");
+                    button.ForeColor = Color.White;
                 }
                 else
                 {
@@ -220,8 +230,14 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             }
             else if (control is Label || control is LinkLabel)
             {
-                control.BackColor = parentBack;
+                control.BackColor = ChromePainter.HostsMetal(control.Parent) ? Color.Transparent : parentBack;
                 control.ForeColor = tag == "theme:muted" ? GetColor("textSecondary") : (tag == "theme:link" ? GetColor("link") : text);
+            }
+            else if (control is PictureBox picture && tag == "theme:emblem")
+            {
+                picture.SizeMode = PictureBoxSizeMode.Zoom;
+                picture.BackColor = parentBack;
+                picture.Image = ChromeAssets.Emblem;
             }
             else if (control is PictureBox || control is ProgressBar)
             {
@@ -287,7 +303,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         /// <summary>
         /// 解析 "#RRGGBB"
         /// </summary>
-        private static bool TryParseColor(string? hex, out Color color)
+        internal static bool TryParseColor(string? hex, out Color color)
         {
             if (!string.IsNullOrEmpty(hex))
             {

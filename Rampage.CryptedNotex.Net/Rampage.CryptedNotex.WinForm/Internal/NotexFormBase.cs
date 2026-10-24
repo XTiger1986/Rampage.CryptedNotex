@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Rampage.CryptedNotex.WinForm.Internal.Themes;
 using Rampage.DependencyInjection;
 using System;
+using System.Windows.Forms;
 
 namespace Rampage.CryptedNotex.WinForm.Internal
 {
@@ -28,6 +30,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
             KeyPreview = true;
+            Icon = ChromeAssets.AppIcon;
         }
 
         /// <summary>

@@ -52,5 +52,31 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         /// 分类色板(侧栏色点/列表标记,按分类序号取模)
         /// </summary>
         public List<string> CategoryPalette { get; set; } = new List<string>();
+
+        /// <summary>
+        /// 金属质感与壁纸。缺省或 metal=none 时保持扁平上色。
+        /// </summary>
+        public ThemeChrome? Chrome { get; set; }
+    }
+
+    /// <summary>
+    /// 主题的金属边框与壁纸(可选；旧主题 JSON 不含此段)
+    /// </summary>
+    public sealed class ThemeChrome
+    {
+        /// <summary>
+        /// 金属：none 扁平 / silver 拉丝银 / black 拉丝黑
+        /// </summary>
+        public string Metal { get; set; } = "none";
+
+        /// <summary>
+        /// 壁纸 id(invader / alienmorph / darkstar / alx / xenomorph)；空则无壁纸
+        /// </summary>
+        public string Wallpaper { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 内发光色(#RRGGBB)；空则用 accent
+        /// </summary>
+        public string Glow { get; set; } = string.Empty;
     }
 }

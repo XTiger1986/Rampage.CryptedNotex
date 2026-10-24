@@ -9,6 +9,7 @@ using Rampage.Model;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
@@ -47,6 +48,11 @@ namespace Rampage.CryptedNotex.WinForm
         private Button _trashButton = null!;
         private Label _userLabel = null!;
         private NoteEditorBase? _activeEditor;
+        private Panel _frame = null!;
+        private SplitContainer _outerSplit = null!;
+        private SplitContainer _innerSplit = null!;
+        private ImageList? _categoryRowImages;
+        private ImageList? _noteRowImages;
 
         private ContextMenuStrip _categoryMenu = null!;
         private ContextMenuStrip _noteMenu = null!;
@@ -70,12 +76,67 @@ namespace Rampage.CryptedNotex.WinForm
         public Notex(IRampageApplication app, CryptoSession session) : base(app)
         {
             _session = session;
-            Text = "加密笔记本 - " + (session.User?.DisplayName ?? string.Empty);
+            Text = NotexBrand.DisplayName + " - " + (session.User?.DisplayName ?? string.Empty);
+            Tag = "theme:wallpaper";
             ClientSize = new Size(1180, 700);
             MinimumSize = new Size(940, 560);
             StartPosition = FormStartPosition.CenterScreen;
             BuildUi();
             BuildMenus();
+        }
+
+        /// <summary>
+        /// 句柄创建后的缩放可能改掉构造时的客户区，这里再钉一次
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ClientSize = new Size(1180, 700);
+            ApplySplitDistances();
+            FitNoteColumns();
+        }
+
+        /// <summary>
+        /// 笔记列表列宽跟客户区走，避免底部出现横向滚动条
+        /// </summary>
+        private void FitNoteColumns()
+        {
+            if (_noteList.Columns.Count < 3 || _noteList.ClientSize.Width < 120)
+            {
+                return;
+            }
+
+            _noteList.Columns[1].Width = 100;
+            _noteList.Columns[2].Width = 72;
+            int titleWidth = _noteList.ClientSize.Width - 100 - 72 - 8;
+            if (titleWidth > 80)
+            {
+                _noteList.Columns[0].Width = titleWidth;
+            }
+        }
+
+        /// <summary>
+        /// 窗体有了真实宽度后再摆分割条，避免构造时被夹成一条缝
+        /// </summary>
+        private void ApplySplitDistances()
+        {
+            try
+            {
+                int outer = Math.Min(240, Math.Max(_outerSplit.Panel1MinSize, _outerSplit.Width - _outerSplit.Panel2MinSize - _outerSplit.SplitterWidth));
+                if (outer > _outerSplit.Panel1MinSize)
+                {
+                    _outerSplit.SplitterDistance = outer;
+                }
+                int inner = Math.Min(420, Math.Max(_innerSplit.Panel1MinSize, _innerSplit.Width - _innerSplit.Panel2MinSize - _innerSplit.SplitterWidth));
+                if (inner > _innerSplit.Panel1MinSize)
+                {
+                    _innerSplit.SplitterDistance = inner;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // 宽度还不够放下两侧最小尺寸时保持现状
+            }
         }
 
         /// <summary>
@@ -85,6 +146,7 @@ namespace Rampage.CryptedNotex.WinForm
         {
             base.OnLoad(e);
             _userSetting = GetService<IUserSettingService>().GetUserSetting(_session.User!.Id);
+            ApplyFramePadding();
             ApplyEditorFonts();
             Internal.Themes.ThemeManager.CurrentChanged += OnThemeChanged;
 
@@ -103,6 +165,8 @@ namespace Rampage.CryptedNotex.WinForm
         {
             FlushEditorPendingSave();
             _autoLock?.Dispose();
+            _categoryRowImages?.Dispose();
+            _noteRowImages?.Dispose();
             Internal.Themes.ThemeManager.CurrentChanged -= OnThemeChanged;
             base.OnFormClosing(e);
         }
@@ -118,6 +182,29 @@ namespace Rampage.CryptedNotex.WinForm
                 _searchBox.SelectAll();
                 return true;
             }
+            if (keyData == (Keys.Control | Keys.D1) || keyData == (Keys.Control | Keys.NumPad1))
+            {
+                ActivateDefaultCategory();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.D2) || keyData == (Keys.Control | Keys.NumPad2))
+            {
+                if (!_trashView)
+                {
+                    ToggleTrashView();
+                }
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.D3) || keyData == (Keys.Control | Keys.NumPad3))
+            {
+                OpenSettings();
+                return true;
+            }
+            if (keyData == Keys.Delete && _noteList.ContainsFocus && !_trashView)
+            {
+                TrashSelectedNote();
+                return true;
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -128,18 +215,33 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildUi()
         {
-            SplitContainer outer = new SplitContainer
+            _frame = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Tag = "theme:inset"
+            };
+
+            _outerSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 FixedPanel = FixedPanel.Panel1,
-                SplitterDistance = 220,
-                Panel1MinSize = 180
+                Panel1MinSize = 200
             };
+            _outerSplit.Panel1.Tag = "theme:sidebar";
 
-            BuildSidebar(outer.Panel1);
-            BuildContentArea(outer.Panel2);
-            Controls.Add(outer);
+            BuildSidebar(_outerSplit.Panel1);
+            BuildContentArea(_outerSplit.Panel2);
+            _frame.Controls.Add(_outerSplit);
+            Controls.Add(_frame);
+        }
+
+        /// <summary>
+        /// 有壁纸时留出一圈桌面边，扁平主题则贴边
+        /// </summary>
+        private void ApplyFramePadding()
+        {
+            _frame.Padding = Internal.Themes.ChromePainter.HasWallpaper ? new Padding(10) : Padding.Empty;
         }
 
         /// <summary>
@@ -147,29 +249,56 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildSidebar(Panel panel)
         {
+            TableLayoutPanel grid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 4,
+                Margin = new Padding(0)
+            };
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            panel.Controls.Add(grid);
+
+            Panel brand = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+                Tag = "theme:brand",
+                Text = NotexBrand.DisplayName
+            };
+            grid.Controls.Add(brand, 0, 0);
+
             FlowLayoutPanel topPanel = new FlowLayoutPanel
             {
-                Dock = DockStyle.Top,
-                Height = 38,
-                Padding = new Padding(6, 6, 6, 4)
+                Dock = DockStyle.Fill,
+                Padding = new Padding(6, 4, 6, 2),
+                WrapContents = false,
+                Margin = new Padding(0),
+                Tag = "theme:chrome"
             };
             Button newCategoryButton = new Button
             {
-                Text = "＋ 新建分类",
-                AutoSize = true
+                Text = "新建分类",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             newCategoryButton.Click += (sender, e) => CreateCategory();
             topPanel.Controls.Add(newCategoryButton);
-            panel.Controls.Add(topPanel);
 
             _trashButton = new Button
             {
-                Text = "🗑 回收站",
-                AutoSize = true
+                Text = "回收站",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             _trashButton.Click += (sender, e) => ToggleTrashView();
             topPanel.Controls.Add(_trashButton);
+            grid.Controls.Add(topPanel, 0, 1);
 
+            _categoryRowImages = new ImageList { ImageSize = new Size(1, 32) };
             _categoryList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -178,36 +307,47 @@ namespace Rampage.CryptedNotex.WinForm
                 HideSelection = false,
                 ShowGroups = false,
                 HeaderStyle = ColumnHeaderStyle.None,
-                MultiSelect = false
+                MultiSelect = false,
+                OwnerDraw = true,
+                BorderStyle = BorderStyle.None,
+                SmallImageList = _categoryRowImages
             };
-            _categoryList.Columns.Add("分类", 190);
+            _categoryList.Columns.Add("分类", 200);
+            _categoryList.DrawItem += SuppressListItemDraw;
+            _categoryList.DrawSubItem += CategoryDrawSubItem;
+            _categoryList.DrawColumnHeader += (sender, e) => e.DrawDefault = true;
             _categoryList.SelectedIndexChanged += OnCategorySelected;
             _categoryList.MouseUp += CategoryListMouseUp;
-            panel.Controls.Add(_categoryList);
+            grid.Controls.Add(_categoryList, 0, 2);
 
             TableLayoutPanel bottomPanel = new TableLayoutPanel
             {
-                Dock = DockStyle.Bottom,
-                Height = 76,
+                Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 2,
-                Padding = new Padding(6)
+                Padding = new Padding(6),
+                Margin = new Padding(0),
+                Tag = "theme:chrome"
             };
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
             Button settingsButton = new Button
             {
-                Text = "⚙ 设置",
-                Dock = DockStyle.Fill
+                Text = "设置",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2)
             };
             settingsButton.Click += (sender, e) => OpenSettings();
             bottomPanel.Controls.Add(settingsButton, 0, 0);
 
             Button aboutButton = new Button
             {
-                Text = "ℹ 关于",
-                Dock = DockStyle.Fill
+                Text = "关于",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2)
             };
             aboutButton.Click += (sender, e) =>
             {
@@ -220,7 +360,7 @@ namespace Rampage.CryptedNotex.WinForm
 
             _userLabel = new Label
             {
-                Text = "👤 " + (_session.User?.DisplayName ?? string.Empty),
+                Text = _session.User?.DisplayName ?? string.Empty,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Tag = "theme:muted"
@@ -230,7 +370,8 @@ namespace Rampage.CryptedNotex.WinForm
             Button logoutButton = new Button
             {
                 Text = "登出",
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2)
             };
             logoutButton.Click += (sender, e) =>
             {
@@ -239,7 +380,7 @@ namespace Rampage.CryptedNotex.WinForm
                 Close();
             };
             bottomPanel.Controls.Add(logoutButton, 1, 1);
-            panel.Controls.Add(bottomPanel);
+            grid.Controls.Add(bottomPanel, 0, 3);
         }
 
         /// <summary>
@@ -247,18 +388,17 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildContentArea(Panel panel)
         {
-            SplitContainer inner = new SplitContainer
+            _innerSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 FixedPanel = FixedPanel.Panel1,
-                SplitterDistance = 350,
                 Panel1MinSize = 260
             };
 
-            BuildNoteListColumn(inner.Panel1);
-            BuildEditorColumn(inner.Panel2);
-            panel.Controls.Add(inner);
+            BuildNoteListColumn(_innerSplit.Panel1);
+            BuildEditorColumn(_innerSplit.Panel2);
+            panel.Controls.Add(_innerSplit);
         }
 
         /// <summary>
@@ -272,16 +412,16 @@ namespace Rampage.CryptedNotex.WinForm
                 ColumnCount = 1,
                 RowCount = 3
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             _searchBox = new TextBox
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Microsoft YaHei UI", 9.5F),
-                Margin = new Padding(6, 6, 6, 2),
-                PlaceholderText = "🔍 按标题搜索 (Ctrl+F)"
+                Margin = new Padding(8, 8, 8, 2),
+                PlaceholderText = "按标题搜索 (Ctrl+F)"
             };
             _searchBox.TextChanged += (sender, e) =>
             {
@@ -296,25 +436,32 @@ namespace Rampage.CryptedNotex.WinForm
             };
             layout.Controls.Add(_searchBox, 0, 0);
 
-            _normalToolbar = new Panel
+            _normalToolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Height = 36,
-                Margin = new Padding(6, 2, 6, 2)
+                AutoSize = true,
+                WrapContents = false,
+                Margin = new Padding(6, 2, 6, 2),
+                Padding = new Padding(2, 2, 2, 0),
+                Tag = "theme:chrome"
             };
             BuildNormalToolbar(_normalToolbar);
             layout.Controls.Add(_normalToolbar, 0, 1);
 
-            _trashToolbar = new Panel
+            _trashToolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Height = 36,
+                AutoSize = true,
+                WrapContents = false,
                 Margin = new Padding(6, 2, 6, 2),
-                Visible = false
+                Padding = new Padding(2, 2, 2, 0),
+                Visible = false,
+                Tag = "theme:chrome"
             };
             BuildTrashToolbar(_trashToolbar);
             layout.Controls.Add(_trashToolbar, 0, 1);
 
+            _noteRowImages = new ImageList { ImageSize = new Size(1, 30) };
             _noteList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -322,11 +469,19 @@ namespace Rampage.CryptedNotex.WinForm
                 FullRowSelect = true,
                 HideSelection = false,
                 MultiSelect = false,
+                OwnerDraw = true,
+                BorderStyle = BorderStyle.None,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                SmallImageList = _noteRowImages,
                 Margin = new Padding(6, 2, 6, 6)
             };
-            _noteList.Columns.Add("标题", 200);
-            _noteList.Columns.Add("修改时间", 118);
-            _noteList.Columns.Add("字数", 58);
+            _noteList.Columns.Add("标题", 160);
+            _noteList.Columns.Add("修改时间", 108);
+            _noteList.Columns.Add("字数", 56);
+            _noteList.Resize += (sender, e) => FitNoteColumns();
+            _noteList.DrawItem += SuppressListItemDraw;
+            _noteList.DrawSubItem += NoteListDrawSubItem;
+            _noteList.DrawColumnHeader += NoteListDrawHeader;
             _noteList.SelectedIndexChanged += OnNoteSelected;
             _noteList.MouseUp += NoteListMouseUp;
             layout.Controls.Add(_noteList, 0, 2);
@@ -340,9 +495,9 @@ namespace Rampage.CryptedNotex.WinForm
         {
             Button newNoteButton = new Button
             {
-                Text = "＋ 新建笔记 ▾",
-                Location = new Point(0, 2),
-                AutoSize = true
+                Text = "新建笔记",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             newNoteButton.Click += (sender, e) =>
             {
@@ -353,18 +508,18 @@ namespace Rampage.CryptedNotex.WinForm
 
             Button pinButton = new Button
             {
-                Text = "📌 置顶",
-                Location = new Point(120, 2),
-                AutoSize = true
+                Text = "置顶",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             pinButton.Click += (sender, e) => TogglePinned();
             panel.Controls.Add(pinButton);
 
             Button trashButton = new Button
             {
-                Text = "🗑 删除",
-                Location = new Point(200, 2),
-                AutoSize = true
+                Text = "删除",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             trashButton.Click += (sender, e) => TrashSelectedNote();
             panel.Controls.Add(trashButton);
@@ -377,18 +532,18 @@ namespace Rampage.CryptedNotex.WinForm
         {
             Button restoreButton = new Button
             {
-                Text = "↩ 恢复",
-                Location = new Point(0, 2),
-                AutoSize = true
+                Text = "恢复",
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             restoreButton.Click += (sender, e) => RestoreSelectedNote();
             panel.Controls.Add(restoreButton);
 
             Button purgeButton = new Button
             {
-                Text = "✖ 彻底删除",
-                Location = new Point(90, 2),
+                Text = "彻底删除",
                 AutoSize = true,
+                Margin = new Padding(2),
                 Tag = "theme:danger"
             };
             purgeButton.Click += (sender, e) => PurgeSelectedNote();
@@ -397,8 +552,8 @@ namespace Rampage.CryptedNotex.WinForm
             Button emptyButton = new Button
             {
                 Text = "清空回收站",
-                Location = new Point(210, 2),
-                AutoSize = true
+                AutoSize = true,
+                Margin = new Padding(2)
             };
             emptyButton.Click += (sender, e) => EmptyTrash();
             panel.Controls.Add(emptyButton);
@@ -415,35 +570,37 @@ namespace Rampage.CryptedNotex.WinForm
                 ColumnCount = 1,
                 RowCount = 3
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
 
-            Panel headerPanel = new Panel
+            TableLayoutPanel headerPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                AutoSize = true,
-                Margin = new Padding(6, 6, 6, 0)
+                ColumnCount = 1,
+                RowCount = 2,
+                Margin = new Padding(8, 8, 8, 0)
             };
+            headerPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            headerPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             _titleBox = new TextBox
             {
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Fill,
                 Font = new Font("Microsoft YaHei UI", 12F),
                 BorderStyle = BorderStyle.FixedSingle,
-                Height = 32,
                 PlaceholderText = "无标题(标题为明文,敏感信息请写正文)"
             };
             _titleBox.TextChanged += (sender, e) => _activeEditor?.NotifyTitleChanged();
-            headerPanel.Controls.Add(_titleBox);
+            headerPanel.Controls.Add(_titleBox, 0, 0);
 
             FlowLayoutPanel metaRow = new FlowLayoutPanel
             {
-                Dock = DockStyle.Top,
-                Height = 30,
+                Dock = DockStyle.Fill,
                 Padding = new Padding(0, 4, 0, 0),
                 FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false
+                WrapContents = false,
+                Margin = new Padding(0)
             };
             _typeLabel = new Label
             {
@@ -462,7 +619,7 @@ namespace Rampage.CryptedNotex.WinForm
                 Tag = "theme:muted"
             };
             metaRow.Controls.Add(_metaLabel);
-            headerPanel.Controls.Add(metaRow);
+            headerPanel.Controls.Add(metaRow, 0, 1);
             layout.Controls.Add(headerPanel, 0, 0);
 
             _editorHost = new Panel
@@ -511,17 +668,18 @@ namespace Rampage.CryptedNotex.WinForm
             _categoryMenu.Items.Add("删除", null, (sender, e) => DeleteCategory());
 
             _noteMenu = new ContextMenuStrip();
-            _noteMenu.Items.Add("📌 置顶/取消置顶", null, (sender, e) => TogglePinned());
-            _noteMenu.Items.Add("🗑 移入回收站", null, (sender, e) => TrashSelectedNote());
+            _noteMenu.Items.Add("置顶或取消置顶", null, (sender, e) => TogglePinned());
+            _noteMenu.Items.Add("移入回收站", null, (sender, e) => TrashSelectedNote());
 
             _trashNoteMenu = new ContextMenuStrip();
-            _trashNoteMenu.Items.Add("↩ 恢复", null, (sender, e) => RestoreSelectedNote());
-            _trashNoteMenu.Items.Add("✖ 彻底删除", null, (sender, e) => PurgeSelectedNote());
+            _trashNoteMenu.Items.Add("恢复", null, (sender, e) => RestoreSelectedNote());
+            _trashNoteMenu.Items.Add("彻底删除", null, (sender, e) => PurgeSelectedNote());
 
             _newNoteMenu = new ContextMenuStrip();
-            _newNoteMenu.Items.Add("📝 纯文本笔记", null, (sender, e) => CreateNote(ContentType.PlainText));
-            _newNoteMenu.Items.Add("🎨 富文本笔记(RTF)", null, (sender, e) => CreateNote(ContentType.RichText));
-            _newNoteMenu.Items.Add("📄 Markdown 笔记", null, (sender, e) => CreateNote(ContentType.Markdown));
+            _newNoteMenu.Items.Add("纯文本笔记", null, (sender, e) => CreateNote(ContentType.PlainText));
+            _newNoteMenu.Items.Add("富文本笔记", null, (sender, e) => CreateNote(ContentType.RichText));
+            _newNoteMenu.Items.Add("Markdown 笔记", null, (sender, e) => CreateNote(ContentType.Markdown));
+            StyleMenus();
         }
 
         #endregion
@@ -538,10 +696,9 @@ namespace Rampage.CryptedNotex.WinForm
             _categoryList.Items.Clear();
             foreach (Category category in _categories)
             {
-                ListViewItem item = new ListViewItem(CategoryDisplayText(category))
+                ListViewItem item = new ListViewItem(category.Name)
                 {
-                    Tag = category,
-                    ForeColor = Internal.Themes.ThemeManager.GetCategoryColor(_categoryList.Items.Count)
+                    Tag = category
                 };
                 _categoryList.Items.Add(item);
             }
@@ -550,16 +707,6 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 _categoryList.SelectedIndices.Add(0);
             }
-        }
-
-        /// <summary>
-        /// 分类显示文本(独立密码分类带锁标记)
-        /// </summary>
-        private static string CategoryDisplayText(Category category)
-        {
-            string suffix = category.EncryptMode == (int)CategoryEncryptMode.IndependentPassword ? "  🔒" : string.Empty;
-            string prefix = category.IsDefault == 1 ? "★ " : "● ";
-            return prefix + category.Name + suffix;
         }
 
         /// <summary>
@@ -920,18 +1067,226 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private static ListViewItem BuildNoteItem(Note note)
         {
-            ListViewItem item = new ListViewItem((note.IsPinned == 1 ? "📌 " : string.Empty) + (note.Title.Length == 0 ? "无标题" : note.Title))
+            ListViewItem item = new ListViewItem(note.Title.Length == 0 ? "无标题" : note.Title)
             {
                 Tag = note
             };
             DateTime time = (note.UpdateTime ?? note.CreateTime).ToLocalTime();
             item.SubItems.Add(time.ToString("MM-dd HH:mm"));
             item.SubItems.Add(note.WordCount.ToString());
-            if (note.Status == (int)NoteStatus.Trashed)
-            {
-                item.ForeColor = Internal.Themes.ThemeManager.GetColor("trashTint");
-            }
             return item;
+        }
+
+        /// <summary>
+        /// 进入默认分类(Ctrl+1)。已选中时仍退出回收站并刷新。
+        /// </summary>
+        private void ActivateDefaultCategory()
+        {
+            FlushEditorPendingSave();
+            bool wasTrash = _trashView;
+            _trashView = false;
+            SyncViewMode();
+            ListViewItem? target = null;
+            foreach (ListViewItem item in _categoryList.Items)
+            {
+                if (item.Tag is Category category && category.IsDefault == 1)
+                {
+                    target = item;
+                    break;
+                }
+            }
+            if (target == null)
+            {
+                return;
+            }
+
+            if (target.Selected)
+            {
+                if (wasTrash)
+                {
+                    _currentCategory = (Category)target.Tag!;
+                    ReloadNotes();
+                }
+                return;
+            }
+
+            _currentCategory = null;
+            target.Selected = true;
+        }
+
+        /// <summary>
+        /// Details 视图的整行在 DrawSubItem 里画，这里不走系统默认
+        /// </summary>
+        private static void SuppressListItemDraw(object? sender, DrawListViewItemEventArgs e)
+        {
+        }
+
+        /// <summary>
+        /// 分类行：色点、默认分类环、独立密码锁
+        /// </summary>
+        private void CategoryDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.ColumnIndex != 0 || e.Item == null)
+            {
+                return;
+            }
+
+            Category? category = e.Item.Tag as Category;
+            bool selected = e.Item.Selected;
+            Color back = selected
+                ? Internal.Themes.ThemeManager.GetColor("selectionBack")
+                : Internal.Themes.ThemeManager.GetColor("panelAltBack");
+            using (SolidBrush brush = new SolidBrush(back))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+
+            Color dot = Internal.Themes.ThemeManager.GetCategoryColor(e.Item.Index);
+            int midY = e.Bounds.Y + e.Bounds.Height / 2;
+            SmoothingMode old = e.Graphics.SmoothingMode;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (SolidBrush dotBrush = new SolidBrush(dot))
+            {
+                e.Graphics.FillEllipse(dotBrush, e.Bounds.X + 10, midY - 4, 8, 8);
+            }
+            if (category != null && category.IsDefault == 1)
+            {
+                using (Pen ring = new Pen(dot, 1.2F))
+                {
+                    e.Graphics.DrawEllipse(ring, e.Bounds.X + 7, midY - 7, 14, 14);
+                }
+            }
+            if (category != null && category.EncryptMode == (int)CategoryEncryptMode.IndependentPassword)
+            {
+                DrawLock(e.Graphics, new Rectangle(e.Bounds.Right - 22, midY - 7, 12, 14), Internal.Themes.ThemeManager.GetColor("textSecondary"));
+            }
+            e.Graphics.SmoothingMode = old;
+
+            Rectangle textRect = new Rectangle(e.Bounds.X + 28, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 52), e.Bounds.Height);
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.SubItem?.Text ?? string.Empty,
+                _categoryList.Font,
+                textRect,
+                Internal.Themes.ThemeManager.GetColor("text"),
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+
+        /// <summary>
+        /// 笔记列表表头
+        /// </summary>
+        private void NoteListDrawHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            Color back = Internal.Themes.ThemeManager.GetColor("panelBack");
+            using (SolidBrush brush = new SolidBrush(back))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            Rectangle textRect = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.Header?.Text ?? string.Empty,
+                _noteList.Font,
+                textRect,
+                Internal.Themes.ThemeManager.GetColor("textSecondary"),
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            using (Pen pen = new Pen(Internal.Themes.ThemeManager.GetColor("border")))
+            {
+                e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+            }
+        }
+
+        /// <summary>
+        /// 笔记行：置顶菱形、回收站色
+        /// </summary>
+        private void NoteListDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.Item == null)
+            {
+                return;
+            }
+
+            Note? note = e.Item.Tag as Note;
+            bool selected = e.Item.Selected;
+            Color back = selected
+                ? Internal.Themes.ThemeManager.GetColor("selectionBack")
+                : Internal.Themes.ThemeManager.GetColor("panelAltBack");
+            Color fore = Internal.Themes.ThemeManager.GetColor("text");
+            if (note != null && note.Status == (int)NoteStatus.Trashed)
+            {
+                fore = Internal.Themes.ThemeManager.GetColor("trashTint");
+            }
+            else if (e.ColumnIndex > 0 && !selected)
+            {
+                fore = Internal.Themes.ThemeManager.GetColor("textSecondary");
+            }
+
+            using (SolidBrush brush = new SolidBrush(back))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+
+            Rectangle textRect = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);
+            if (e.ColumnIndex == 0 && note != null && note.IsPinned == 1)
+            {
+                DrawPin(e.Graphics, e.Bounds, Internal.Themes.ThemeManager.GetColor("pinnedMark"));
+                textRect.X += 16;
+                textRect.Width = Math.Max(0, textRect.Width - 16);
+            }
+            TextRenderer.DrawText(
+                e.Graphics,
+                e.SubItem?.Text ?? string.Empty,
+                _noteList.Font,
+                textRect,
+                fore,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+
+        /// <summary>
+        /// 置顶标记
+        /// </summary>
+        private static void DrawPin(Graphics graphics, Rectangle bounds, Color color)
+        {
+            int cx = bounds.X + 12;
+            int cy = bounds.Y + bounds.Height / 2;
+            Point[] diamond = new Point[]
+            {
+                new Point(cx, cy - 5),
+                new Point(cx + 4, cy),
+                new Point(cx, cy + 5),
+                new Point(cx - 4, cy)
+            };
+            SmoothingMode old = graphics.SmoothingMode;
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (SolidBrush brush = new SolidBrush(color))
+            {
+                graphics.FillPolygon(brush, diamond);
+            }
+            graphics.SmoothingMode = old;
+        }
+
+        /// <summary>
+        /// 独立密码锁形
+        /// </summary>
+        private static void DrawLock(Graphics graphics, Rectangle box, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.4F))
+            using (SolidBrush brush = new SolidBrush(color))
+            {
+                graphics.DrawArc(pen, box.X + 2, box.Y, box.Width - 4, box.Width - 4, 200, 140);
+                graphics.FillRectangle(brush, box.X, box.Y + 6, box.Width, box.Height - 6);
+            }
+        }
+
+        /// <summary>
+        /// 右键菜单跟当前主题
+        /// </summary>
+        private void StyleMenus()
+        {
+            Internal.Themes.ChromePainter.StyleMenu(_categoryMenu);
+            Internal.Themes.ChromePainter.StyleMenu(_noteMenu);
+            Internal.Themes.ChromePainter.StyleMenu(_trashNoteMenu);
+            Internal.Themes.ChromePainter.StyleMenu(_newNoteMenu);
         }
 
         /// <summary>
@@ -1686,6 +2041,8 @@ namespace Rampage.CryptedNotex.WinForm
             if (IsHandleCreated)
             {
                 Internal.Themes.ThemeManager.Apply(this);
+                ApplyFramePadding();
+                StyleMenus();
             }
         }
 

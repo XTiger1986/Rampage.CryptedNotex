@@ -1,4 +1,4 @@
-# Rampage.CryptedNotex 加密笔记本 · 产品文档
+# 秘密档案（CryptedNotex）· 产品文档
 
 - 版本：v1.0（2026-10-24）
 - 状态：设计定稿，随实现同步修订
@@ -11,7 +11,7 @@
 
 ### 1.1 定位与目标用户
 
-CryptedNotex 是一款**本地离线**的加密笔记本：笔记内容以用户密码派生的密钥加密后才写入 SQLite 数据库，数据库文件即使被整份拷走，正文与附件也无法被读取。面向对数据自主与隐私有较高要求的个人用户。
+秘密档案（工程名 CryptedNotex）是一款**本地离线**的加密笔记本：笔记内容以用户密码派生的密钥加密后才写入 SQLite 数据库，数据库文件即使被整份拷走，正文与附件也无法被读取。面向对数据自主与隐私有较高要求的个人用户。界面中文名是「秘密档案」；程序集、密文附加认证数据和数据库文件名仍用 CryptedNotex，已有密文不因改名失效。
 
 ### 1.2 核心价值主张
 
@@ -86,7 +86,8 @@ Rampage.CryptedNotex.Net\
   Rampage.CryptedNotex.BLL\           IXxxService + Implementations\XxxService
   Rampage.CryptedNotex.WinForm\
     Internal\                         NotexFormBase / CryptoSession / AutoLockManager / ThemeManager / NotexGuiContext / ServiceRefs
-    Internal\Themes\                  Theme 模型 + 6 套内嵌主题 JSON
+    Internal\Themes\                  Theme 模型 + 11 套内嵌主题 JSON
+    Assets\Chrome\                    金属纹理、壁纸、档案徽记（内嵌）
     Forms\                            登录/主窗体/各对话框
     Controls\                         编辑器与附件面板
     Assets\Markdown\                  marked/highlight.js 本地资源
@@ -217,8 +218,10 @@ Rampage.CryptedNotex.Net\
 
 ### 4.8 主题系统
 
-- JSON 主题：`id/name/darkTitleBar/colors(20+ 键)/fonts/categoryPalette(8 色板)`（Schema 见附录）；
-- 内嵌 6 套：light 浅色 / dark 深色 / forest 墨绿 / parchment 羊皮纸 / violet 紫罗兰 / contrast 高对比；
+- JSON 主题：`id/name/darkTitleBar/colors(20+ 键)/fonts/categoryPalette(8 色板)`，可选 `chrome`（`metal` none/silver/black、`wallpaper`、`glow`）（Schema 见附录）；
+- 内嵌扁平 6 套：light 浅色 / dark 深色 / forest 墨绿 / parchment 羊皮纸 / violet 紫罗兰 / contrast 高对比；
+- 内嵌金属 5 套：invader 入侵者 / alienmorph 异形形态 / darkstar 暗星 / alx ALX / xenomorph 异形。新用户与尚未写入的全局默认主题为 xenomorph；已保存的偏好不改；
+- 金属主题用原创徽记、拉丝底和壁纸（不使用第三方外壳商标）。编辑器正文区仍是纯色，壁纸只出现在窗体边缘和登录底；
 - exe 旁 `themes\*.json` 按 id 覆盖或追加自定义主题；
 - 登录前使用全局默认主题（setting 表），登录后读取个人偏好；实时切换（含暗色标题栏 DWM 处理）；
 - 分类色：色板按分类序号取模，用于侧栏色点与列表标记。
@@ -287,7 +290,11 @@ Rampage.CryptedNotex.Net\
 
 ### 6.3 快捷键
 
-- `Ctrl+S` 保存当前笔记；`Ctrl+F` 聚焦搜索；`Del` 删除选中笔记（入回收站）；`Ctrl+1/2/3` 侧栏切换 默认/回收站/设置。
+- `Ctrl+S` 保存当前笔记；`Ctrl+F` 聚焦搜索；`Del` 在笔记列表上把选中笔记移入回收站（编辑器内不拦截）；`Ctrl+1` 默认分类，`Ctrl+2` 回收站，`Ctrl+3` 设置。
+
+### 6.4 视觉
+
+登录与首运行是壁纸上的金属卡片，顶部为档案徽记和「秘密档案」。主窗体三栏外留一圈壁纸；侧栏为金属品牌条、分类色点和绘制的锁；列表行自绘（置顶菱形、选中光）。扁平主题不加载壁纸，只换配色。
 
 ---
 
@@ -322,9 +329,12 @@ Rampage.CryptedNotex.Net\
     "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
     "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
   },
-  "categoryPalette": ["#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8", "#9661BC", "#F6903D", "#008685"]
+  "categoryPalette": ["#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8", "#9661BC", "#F6903D", "#008685"],
+  "chrome": { "metal": "black", "wallpaper": "xenomorph", "glow": "#3EC6FF" }
 }
 ```
+
+`chrome` 可省略。`metal` 为 `none` 时与旧主题一样只铺纯色。
 
 ### 8.2 FAQ
 

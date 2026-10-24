@@ -1,0 +1,32 @@
+{
+  "id": "alienmorph",
+  "name": "异形形态",
+  "darkTitleBar": false,
+  "chrome": { "metal": "silver", "wallpaper": "alienmorph", "glow": "#7DD3FC" },
+  "colors": {
+    "windowBack": "#F3F6FA",
+    "panelBack": "#FFFFFF",
+    "panelAltBack": "#F7F9FC",
+    "border": "#D5DDE6",
+    "inputBack": "#FFFFFF",
+    "inputBorder": "#D0D7E0",
+    "text": "#1E293B",
+    "textSecondary": "#64748B",
+    "accent": "#3B82F6",
+    "accentText": "#FFFFFF",
+    "selectionBack": "#E0EFFF",
+    "pinnedMark": "#B45309",
+    "trashTint": "#B45454",
+    "warning": "#A16207",
+    "danger": "#DC2626",
+    "link": "#2563EB",
+    "editorBack": "#FFFFFF",
+    "editorText": "#1E293B",
+    "previewBack": "#FFFFFF"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#3B82F6", "#06B6D4", "#8B5CF6", "#10B981", "#F59E0B", "#EC4899", "#64748B", "#0EA5E9" ]
+}
