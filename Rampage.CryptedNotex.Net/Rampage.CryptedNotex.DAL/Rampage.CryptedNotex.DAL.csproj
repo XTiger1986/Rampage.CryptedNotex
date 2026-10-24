@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Rampage\DatabaseLibrary\Rampage.Dapper\Rampage.Dapper.csproj" />
+    <ProjectReference Include="..\..\..\Rampage\DatabaseLibrary\Rampage.DatabaseLibrary.Sqlite\Rampage.DatabaseLibrary.Sqlite.csproj" />
+    <ProjectReference Include="..\..\..\Rampage\Rampage\Rampage.csproj" />
+    <ProjectReference Include="..\Rampage.CryptedNotex.Common\Rampage.CryptedNotex.Common.csproj" />
+    <ProjectReference Include="..\Rampage.CryptedNotex.Model\Rampage.CryptedNotex.Model.csproj" />
+  </ItemGroup>
+
+  <!-- 表结构脚本唯一权威来源在 documents\DatabaseTablesDesign,以链接方式内嵌为资源供 SchemaInitializer 首运行建表 -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\documents\DatabaseTablesDesign\*.sql" LogicalName="Rampage.CryptedNotex.DAL.Schema.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

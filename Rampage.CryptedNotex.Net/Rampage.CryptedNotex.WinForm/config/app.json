@@ -1,0 +1,17 @@
+{
+  "DatabaseFactory": {
+    "DataAccessTypeName": "Rampage.Dapper.DapperDataAccessor, Rampage.Dapper",
+    "Clients": [
+      {
+        "Name": "CryptedNotex",
+        "Type": "Sqlite",
+        "ConnectionString": "Data Source=data/cryptednotex.db"
+      }
+    ]
+  },
+  "LoginProtection": {
+    "Enabled": true,
+    "MaxFailuresPerAccount": 5,
+    "WindowSeconds": 300
+  }
+}

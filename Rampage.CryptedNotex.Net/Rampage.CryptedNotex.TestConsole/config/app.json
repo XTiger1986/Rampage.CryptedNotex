@@ -1,0 +1,12 @@
+{
+  "DatabaseFactory": {
+    "DataAccessTypeName": "Rampage.Dapper.DapperDataAccessor, Rampage.Dapper",
+    "Clients": [
+      {
+        "Name": "CryptedNotex",
+        "Type": "Sqlite",
+        "ConnectionString": "Data Source=e2e-test.db"
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "parchment",
+  "name": "羊皮纸",
+  "darkTitleBar": false,
+  "colors": {
+    "windowBack": "#F3EAD8",
+    "panelBack": "#EAE0C9",
+    "panelAltBack": "#FAF4E6",
+    "border": "#D6C7A3",
+    "inputBack": "#FDFAF2",
+    "inputBorder": "#C9B98F",
+    "text": "#4A3F2A",
+    "textSecondary": "#8D7F63",
+    "accent": "#8C6D3A",
+    "accentText": "#FDFAF2",
+    "selectionBack": "#E3D3AE",
+    "pinnedMark": "#A87C1F",
+    "trashTint": "#9C7B5E",
+    "warning": "#9C7421",
+    "danger": "#A94438",
+    "link": "#7A5C28",
+    "editorBack": "#FDFAF2",
+    "editorText": "#4A3F2A",
+    "previewBack": "#FDFAF2"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#8C6D3A", "#7A8C4E", "#A8553D", "#5E7A8C", "#8C5E7A", "#6E8C5E", "#8C7A4E", "#4E8C7A" ]
+}

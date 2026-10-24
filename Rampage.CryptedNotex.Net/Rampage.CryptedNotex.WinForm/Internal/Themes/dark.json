@@ -1,0 +1,31 @@
+{
+  "id": "dark",
+  "name": "深色",
+  "darkTitleBar": true,
+  "colors": {
+    "windowBack": "#1E1E1E",
+    "panelBack": "#252526",
+    "panelAltBack": "#2D2D30",
+    "border": "#3F3F46",
+    "inputBack": "#333333",
+    "inputBorder": "#3C3C3C",
+    "text": "#F0F0F0",
+    "textSecondary": "#A0A0A0",
+    "accent": "#007ACC",
+    "accentText": "#FFFFFF",
+    "selectionBack": "#094771",
+    "pinnedMark": "#FFB900",
+    "trashTint": "#5A3A3A",
+    "warning": "#D7BA7D",
+    "danger": "#F14C4C",
+    "link": "#4EC9B0",
+    "editorBack": "#1E1E1E",
+    "editorText": "#D4D4D4",
+    "previewBack": "#FFFFFF"
+  },
+  "fonts": {
+    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
+    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+  },
+  "categoryPalette": [ "#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8", "#9661BC", "#F6903D", "#008685" ]
+}

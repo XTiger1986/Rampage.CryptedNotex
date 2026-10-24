@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown Preview</title>
+<link id="mdStyle" rel="stylesheet" href="https://notex-assets/github-markdown-light.css">
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body.dark { background: #0d1117; }
+  .markdown-body { box-sizing: border-box; max-width: 980px; margin: 0 auto; padding: 24px 32px 64px; }
+</style>
+<script src="https://notex-assets/marked.min.js"></script>
+<script src="https://notex-assets/highlight.min.js"></script>
+</head>
+<body>
+<article id="content" class="markdown-body"><p style="color:#888">开始输入即可预览…</p></article>
+<script>
+window.renderMarkdown = function (text) {
+  var el = document.getElementById('content');
+  try {
+    el.innerHTML = marked.parse(text || '');
+  } catch (e) {
+    el.textContent = text || '';
+  }
+  if (window.hljs) {
+    el.querySelectorAll('pre code').forEach(function (block) {
+      try { hljs.highlightElement(block); } catch (e) { }
+    });
+  }
+};
+window.setThemeMode = function (mode) {
+  var dark = mode === 'dark';
+  document.body.classList.toggle('dark', dark);
+  document.getElementById('mdStyle').href = 'https://notex-assets/github-markdown-' + (dark ? 'dark' : 'light') + '.css';
+};
+</script>
+</body>
+</html>

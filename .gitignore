@@ -1,0 +1,17 @@
+# Visual Studio 缓存
+.vs/
+
+# 构建产物
+bin/
+obj/
+
+# 运行时数据(数据库/日志绝不入库)
+data/
+__Logs/
+*.db
+*.db-shm
+*.db-wal
+e2e-test.db*
+
+# 验证截图等临时产物
+notex-screenshot-*.png

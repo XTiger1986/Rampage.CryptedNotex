@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- WebView2 包自带的 WPF 程序集引用了 WindowsBase 5.0 与框架 WindowsBase 4.0 冲突(MSB3277)；本程序为 WinForms 不使用该程序集,属良性冲突,精准抑制 -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Rampage\Rampage.Drawing\Rampage.Drawing.csproj" />
+    <ProjectReference Include="..\..\..\Rampage\Rampage\Rampage.csproj" />
+    <ProjectReference Include="..\Rampage.CryptedNotex.BLL\Rampage.CryptedNotex.BLL.csproj" />
+    <ProjectReference Include="..\Rampage.CryptedNotex.Common\Rampage.CryptedNotex.Common.csproj" />
+    <ProjectReference Include="..\Rampage.CryptedNotex.Model\Rampage.CryptedNotex.Model.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
+  <!-- 内嵌主题资源 -->
+  <ItemGroup>
+    <EmbeddedResource Include="Internal\Themes\*.json" LogicalName="Rampage.CryptedNotex.WinForm.Internal.Themes.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- 配置文件随构建复制到输出目录 -->
+  <ItemGroup>
+    <Content Include="config\app.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="config\log4net.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Markdown 预览本地资源(离线可用) -->
+  <ItemGroup>
+    <Content Include="Assets\Markdown\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
