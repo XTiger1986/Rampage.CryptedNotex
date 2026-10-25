@@ -18,6 +18,8 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public const long SIZE_WARNING_BYTES = 50L * 1024 * 1024;
 
         private readonly FlowLayoutPanel _flowPanel;
+        private readonly Button _addButton;
+        private bool _readOnly;
 
         /// <summary>
         /// 请求宿主添加附件(打开文件选择框)
@@ -59,17 +61,27 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 WrapContents = false
             };
 
-            Button addButton = new Button
+            _addButton = new Button
             {
                 Text = "添加附件",
                 AutoSize = true,
                 Margin = new Padding(2, 4, 4, 4)
             };
-            addButton.Click += (sender, e) => AddAttachmentRequested?.Invoke(this, EventArgs.Empty);
+            _addButton.Click += (sender, e) => AddAttachmentRequested?.Invoke(this, EventArgs.Empty);
 
             layout.Controls.Add(_flowPanel, 0, 0);
-            layout.Controls.Add(addButton, 1, 0);
+            layout.Controls.Add(_addButton, 1, 0);
             Controls.Add(layout);
+        }
+
+        /// <summary>
+        /// 只读查看时仍可打开附件，不能添加或删除
+        /// </summary>
+        /// <param name="readOnly">true 为只读</param>
+        public void SetReadOnly(bool readOnly)
+        {
+            _readOnly = readOnly;
+            _addButton.Visible = !readOnly;
         }
 
         /// <summary>
@@ -123,8 +135,9 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Font = new Font("Microsoft YaHei UI", 8F)
             };
             removeButton.Click += (sender, e) => RemoveAttachmentRequested?.Invoke(this, attachment);
+            removeButton.Visible = !_readOnly;
             chip.Controls.Add(removeButton);
-            chip.Width = removeButton.Right + 4;
+            chip.Width = (_readOnly ? nameLabel.Right : removeButton.Right) + 8;
             return chip;
         }
 

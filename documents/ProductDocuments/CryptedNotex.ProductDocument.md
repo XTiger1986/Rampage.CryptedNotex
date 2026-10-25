@@ -185,7 +185,8 @@ Rampage.CryptedNotex.Net\
 
 ### 4.3 笔记与三种类型编辑
 
-- 新建笔记：选择分类与类型（纯文本/富文本/Markdown），初始标题 = `无标题`（可改，标题明文存库）；
+- 新建笔记：选择分类与类型（纯文本/富文本/Markdown），初始标题 = `无标题`（可改，标题明文存库），创建后直接进入编辑；
+- 打开已有笔记默认只读查看（标题、正文不可改，附件可打开但不可增删；Markdown 有预览时只显示渲染结果）。点「编辑」、双击列表或右键「编辑」才进入编辑；「完成」先保存再回到只读。回收站只可查看；
 - 编辑区：PlainNoteEditor（多行文本）、RichNoteEditor（RichTextBox：加粗/斜体/下划线/删除线/字号/前景色/项目符号，RTF 格式存取）、MarkdownNoteEditor（等宽编辑 + WebView2 实时预览，`marked`+`highlight.js` 本地资源；预览可折叠；缺 WebView2 Runtime 时折叠预览并显示降级横幅）；
 - 自动保存：停止输入 2 秒防抖保存；Ctrl+S 立即保存；切换笔记/分类/关窗/锁定前强制 flush；
 - 字数：正文**非空白字符数**（RTF 按 PlainText 口径），保存时明文统计存 `word_count`；

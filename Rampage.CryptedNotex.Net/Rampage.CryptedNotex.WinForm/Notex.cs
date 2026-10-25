@@ -48,6 +48,9 @@ namespace Rampage.CryptedNotex.WinForm
         private Button _trashButton = null!;
         private Label _userLabel = null!;
         private NoteEditorBase? _activeEditor;
+        private Button _editToggleButton = null!;
+        private bool _editing;
+        private bool _openForEdit;
         private Panel _frame = null!;
         private SplitContainer _outerSplit = null!;
         private SplitContainer _innerSplit = null!;
@@ -484,6 +487,7 @@ namespace Rampage.CryptedNotex.WinForm
             _noteList.DrawColumnHeader += NoteListDrawHeader;
             _noteList.SelectedIndexChanged += OnNoteSelected;
             _noteList.MouseUp += NoteListMouseUp;
+            _noteList.DoubleClick += (sender, e) => EnterEdit();
             layout.Controls.Add(_noteList, 0, 2);
             panel.Controls.Add(layout);
         }
@@ -619,6 +623,17 @@ namespace Rampage.CryptedNotex.WinForm
                 Tag = "theme:muted"
             };
             metaRow.Controls.Add(_metaLabel);
+
+            _editToggleButton = new Button
+            {
+                Text = "编辑",
+                AutoSize = true,
+                Enabled = false,
+                Margin = new Padding(16, 0, 0, 0),
+                Tag = "theme:accent"
+            };
+            _editToggleButton.Click += (sender, e) => ToggleEditMode();
+            metaRow.Controls.Add(_editToggleButton);
             headerPanel.Controls.Add(metaRow, 0, 1);
             layout.Controls.Add(headerPanel, 0, 0);
 
@@ -668,6 +683,7 @@ namespace Rampage.CryptedNotex.WinForm
             _categoryMenu.Items.Add("删除", null, (sender, e) => DeleteCategory());
 
             _noteMenu = new ContextMenuStrip();
+            _noteMenu.Items.Add("编辑", null, (sender, e) => EnterEdit());
             _noteMenu.Items.Add("置顶或取消置顶", null, (sender, e) => TogglePinned());
             _noteMenu.Items.Add("移入回收站", null, (sender, e) => TrashSelectedNote());
 
@@ -1386,6 +1402,8 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void OpenNote(Note note)
         {
+            bool edit = _openForEdit && !_trashView;
+            _openForEdit = false;
             FlushEditorPendingSave();
             Category? category = FindCategory(note.CategoryId);
             if (category == null)
@@ -1420,14 +1438,76 @@ namespace Rampage.CryptedNotex.WinForm
 
             _currentNote = note;
             HideEditorMessage();
+            NoteEditorBase editor = ActivateEditor(detail.Data.ContentType);
+            ApplyReadingMode(edit);
             _titleBox.Text = detail.Data.Title;
             _typeLabel.Text = TypeName(detail.Data.ContentType);
             _metaLabel.Text = "修改 " + (detail.Data.UpdateTime ?? detail.Data.CreateTime).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
                 + " · " + detail.Data.WordCount + " 字";
-            NoteEditorBase editor = ActivateEditor(detail.Data.ContentType);
             editor.LoadNote(detail.Data);
-            LoadAttachments(note.Id);
             SaveLastNoteId(note.Id);
+        }
+
+        /// <summary>
+        /// 在只读查看与编辑之间切换。回收站只允许查看。
+        /// </summary>
+        private void ToggleEditMode()
+        {
+            if (_editing)
+            {
+                FinishEdit();
+            }
+            else
+            {
+                EnterEdit();
+            }
+        }
+
+        /// <summary>
+        /// 进入编辑。打开已有笔记时默认不调用，需用户明确选择。
+        /// </summary>
+        private void EnterEdit()
+        {
+            if (_currentNote == null || _trashView || _editing)
+            {
+                return;
+            }
+
+            ApplyReadingMode(true);
+            _titleBox.Focus();
+        }
+
+        /// <summary>
+        /// 结束编辑：先保存未写入的修改，再回到只读查看
+        /// </summary>
+        private void FinishEdit()
+        {
+            if (!_editing)
+            {
+                return;
+            }
+
+            FlushEditorPendingSave();
+            ApplyReadingMode(false);
+        }
+
+        /// <summary>
+        /// 应用查看或编辑：标题、正文、附件增删一起切换
+        /// </summary>
+        /// <param name="editing">true 为可编辑</param>
+        private void ApplyReadingMode(bool editing)
+        {
+            bool canEdit = _currentNote != null && !_trashView;
+            _editing = editing && canEdit;
+            _titleBox.ReadOnly = !_editing;
+            _editToggleButton.Text = _editing ? "完成" : "编辑";
+            _editToggleButton.Enabled = canEdit;
+            _activeEditor?.SetReadOnly(!_editing);
+            _attachmentPanel.SetReadOnly(!_editing);
+            if (_currentNote != null)
+            {
+                LoadAttachments(_currentNote.Id);
+            }
         }
 
         /// <summary>
@@ -1508,6 +1588,7 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             ReloadNotes();
+            _openForEdit = true;
             foreach (ListViewItem item in _noteList.Items)
             {
                 if (((Note)item.Tag!).Id == note.Id)
@@ -1795,7 +1876,12 @@ namespace Rampage.CryptedNotex.WinForm
         private void ClearEditor()
         {
             _currentNote = null;
+            _editing = false;
+            _titleBox.ReadOnly = true;
             _titleBox.Text = string.Empty;
+            _editToggleButton.Text = "编辑";
+            _editToggleButton.Enabled = false;
+            _attachmentPanel.SetReadOnly(true);
             _metaLabel.Text = "选择或新建一条笔记";
             _typeLabel.Text = string.Empty;
             foreach (KeyValuePair<ContentType, NoteEditorBase> pair in _editors)
@@ -1854,9 +1940,9 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void AddAttachment()
         {
-            if (_currentNote == null)
+            if (_currentNote == null || !_editing)
             {
-                MessageBox.Show("请先打开一条笔记", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("请先进入编辑", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
             Category? category = FindCategory(_currentNote.CategoryId);
@@ -1983,6 +2069,11 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void RemoveAttachment(NoteAttachment attachment)
         {
+            if (!_editing)
+            {
+                return;
+            }
+
             GetService<INoteAttachmentService>().RemoveAttachment(attachment.Id);
             if (_currentNote != null)
             {

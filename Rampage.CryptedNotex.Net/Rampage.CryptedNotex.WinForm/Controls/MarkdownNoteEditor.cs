@@ -48,7 +48,10 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             };
             _textBox.TextChanged += (sender, e) =>
             {
-                MarkDirty();
+                if (!IsReadOnly)
+                {
+                    MarkDirty();
+                }
                 RestartPreviewTimer();
             };
             _textBox.KeyDown += EditorKeyDown;
@@ -106,6 +109,30 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public override void SetEditorFont(string family, double size)
         {
             _textBox.Font = CreateSafeEditorFont(family, size);
+        }
+
+        /// <inheritdoc />
+        public override void SetReadOnly(bool readOnly)
+        {
+            base.SetReadOnly(readOnly);
+            _textBox.ReadOnly = readOnly;
+            ApplyPreviewLayout();
+        }
+
+        /// <summary>
+        /// 只读且预览可用时只显示渲染结果；编辑或没有预览时显示源码
+        /// </summary>
+        private void ApplyPreviewLayout()
+        {
+            bool previewOnly = IsReadOnly && _previewReady;
+            try
+            {
+                _splitter.Panel1Collapsed = previewOnly;
+            }
+            catch (InvalidOperationException)
+            {
+                // 分割条尚未完成布局时忽略，预览就绪后会再调一次
+            }
         }
 
         /// <summary>
@@ -182,6 +209,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             _splitter.Panel2.Controls.Add(_webView);
             _splitter.Panel2.ResumeLayout();
             Internal.Themes.ThemeManager.Apply(_splitter.Panel1);
+            ApplyPreviewLayout();
         }
 
         /// <summary>

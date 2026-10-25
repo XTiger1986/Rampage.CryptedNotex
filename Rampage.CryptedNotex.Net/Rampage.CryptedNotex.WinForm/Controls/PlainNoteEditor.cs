@@ -30,7 +30,13 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Font = new Font("Consolas", 12F),
                 BorderStyle = BorderStyle.None
             };
-            _textBox.TextChanged += (sender, e) => MarkDirty();
+            _textBox.TextChanged += (sender, e) =>
+            {
+                if (!IsReadOnly)
+                {
+                    MarkDirty();
+                }
+            };
             _textBox.KeyDown += EditorKeyDown;
             Controls.Add(_textBox);
         }
@@ -60,6 +66,13 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public override void SetEditorFont(string family, double size)
         {
             _textBox.Font = CreateSafeEditorFont(family, size);
+        }
+
+        /// <inheritdoc />
+        public override void SetReadOnly(bool readOnly)
+        {
+            base.SetReadOnly(readOnly);
+            _textBox.ReadOnly = readOnly;
         }
 
         /// <summary>

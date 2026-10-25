@@ -12,6 +12,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
     public class RichNoteEditor : NoteEditorBase
     {
         private readonly RichTextBox _richTextBox;
+        private readonly FlowLayoutPanel _toolbar;
 
         /// <summary>
         /// 构造富文本编辑器
@@ -27,21 +28,21 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            FlowLayoutPanel toolbar = new FlowLayoutPanel
+            _toolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 Padding = new Padding(2)
             };
-            toolbar.Controls.Add(BuildToolButton("B", FontStyle.Bold));
-            toolbar.Controls.Add(BuildToolButton("I", FontStyle.Italic));
-            toolbar.Controls.Add(BuildToolButton("U", FontStyle.Underline));
-            toolbar.Controls.Add(BuildToolButton("S", FontStyle.Strikeout));
-            toolbar.Controls.Add(BuildSeparator());
-            toolbar.Controls.Add(BuildBulletButton());
-            toolbar.Controls.Add(BuildColorButton());
-            toolbar.Controls.Add(BuildSeparator());
-            toolbar.Controls.Add(BuildFontSizeSelector());
+            _toolbar.Controls.Add(BuildToolButton("B", FontStyle.Bold));
+            _toolbar.Controls.Add(BuildToolButton("I", FontStyle.Italic));
+            _toolbar.Controls.Add(BuildToolButton("U", FontStyle.Underline));
+            _toolbar.Controls.Add(BuildToolButton("S", FontStyle.Strikeout));
+            _toolbar.Controls.Add(BuildSeparator());
+            _toolbar.Controls.Add(BuildBulletButton());
+            _toolbar.Controls.Add(BuildColorButton());
+            _toolbar.Controls.Add(BuildSeparator());
+            _toolbar.Controls.Add(BuildFontSizeSelector());
 
             _richTextBox = new RichTextBox
             {
@@ -50,10 +51,16 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Font = new Font("Microsoft YaHei UI", 11F),
                 AcceptsTab = true
             };
-            _richTextBox.TextChanged += (sender, e) => MarkDirty();
+            _richTextBox.TextChanged += (sender, e) =>
+            {
+                if (!IsReadOnly)
+                {
+                    MarkDirty();
+                }
+            };
             _richTextBox.KeyDown += EditorKeyDown;
 
-            layout.Controls.Add(toolbar, 0, 0);
+            layout.Controls.Add(_toolbar, 0, 0);
             layout.Controls.Add(_richTextBox, 0, 1);
             Controls.Add(layout);
         }
@@ -72,6 +79,14 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 _richTextBox.Text = dto.PlainContent;
             }
             IsDirty = false;
+        }
+
+        /// <inheritdoc />
+        public override void SetReadOnly(bool readOnly)
+        {
+            base.SetReadOnly(readOnly);
+            _richTextBox.ReadOnly = readOnly;
+            _toolbar.Visible = !readOnly;
         }
 
         /// <inheritdoc />

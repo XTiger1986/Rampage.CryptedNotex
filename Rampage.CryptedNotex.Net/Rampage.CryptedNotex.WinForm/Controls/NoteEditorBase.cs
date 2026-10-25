@@ -41,6 +41,15 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         }
 
         /// <summary>
+        /// 是否只读查看(不接受正文与标题修改)
+        /// </summary>
+        public bool IsReadOnly
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
         /// 请求宿主立即保存(自动保存到点或 Ctrl+S)
         /// </summary>
         public event EventHandler? SaveRequested;
@@ -69,6 +78,15 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public abstract int GetWordCount();
 
         /// <summary>
+        /// 切换只读查看与编辑。只读时不把加载内容记成未保存修改。
+        /// </summary>
+        /// <param name="readOnly">true 为只读查看</param>
+        public virtual void SetReadOnly(bool readOnly)
+        {
+            IsReadOnly = readOnly;
+        }
+
+        /// <summary>
         /// 设置编辑器字体(用户偏好)
         /// </summary>
         /// <param name="family">字体族</param>
@@ -82,7 +100,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// </summary>
         public void NotifyTitleChanged()
         {
-            if (Current != null)
+            if (Current != null && !IsReadOnly)
             {
                 MarkDirty();
             }
