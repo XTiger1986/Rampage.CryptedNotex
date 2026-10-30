@@ -26,7 +26,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(440, 360);
+            ClientSize = new Size(460, 400);
             BuildUi();
         }
 
@@ -46,9 +46,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             Label titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
-                Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(92, 20)
+                Location = new Point(96, 22)
             };
             Controls.Add(titleLabel);
 
@@ -57,7 +57,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Text = NotexBrand.TechnicalName,
                 Tag = "theme:muted",
                 AutoSize = true,
-                Location = new Point(94, 52)
+                Location = new Point(98, 56)
             };
             Controls.Add(technicalLabel);
 
@@ -69,34 +69,62 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     "框架：Rampage 自研 ORM/DI/日志",
                 Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(400, 0),
-                Location = new Point(16, 96)
+                MaximumSize = new Size(420, 0),
+                Location = new Point(20, 104)
             };
             Controls.Add(infoLabel);
 
             Button selfTestButton = new Button
             {
                 Text = "加密自检",
-                Location = new Point(16, 200),
-                Size = new Size(180, 34)
+                Location = new Point(20, 214),
+                Size = new Size(160, 36)
             };
-            selfTestButton.Click += (sender, e) => RunSelfTest();
+            selfTestButton.Click += async (sender, e) => await RunSelfTestAsync(selfTestButton);
             Controls.Add(selfTestButton);
 
             _resultLabel = new Label
             {
-                Text = string.Empty,
+                Text = "用一组临时密钥做往返、错钥、篡改和域分隔检查。不会读写你的笔记。",
+                Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(390, 0),
-                Location = new Point(16, 248)
+                MaximumSize = new Size(420, 0),
+                Location = new Point(20, 266)
             };
             Controls.Add(_resultLabel);
         }
 
         /// <summary>
-        /// 加密自检：roundtrip / 错钥 / 篡改 / 换盐四项
+        /// 加密自检：roundtrip / 错钥 / 篡改 / 换盐四项。派生在后台跑，避免卡住窗口。
         /// </summary>
-        private void RunSelfTest()
+        private async Task RunSelfTestAsync(Button button)
+        {
+            button.Enabled = false;
+            _resultLabel.Text = "正在自检…";
+            try
+            {
+                string summary = await RunBusyAsync("正在做加密自检…", RunSelfTestCore);
+                if (IsDisposed)
+                {
+                    return;
+                }
+                _resultLabel.Text = summary;
+                bool passed = summary.StartsWith("全部通过", StringComparison.Ordinal);
+                ShowToast(passed ? "加密自检通过" : summary, passed ? ToastKind.Success : ToastKind.Error);
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    button.Enabled = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 加密自检本体(可在后台线程调用)
+        /// </summary>
+        private static string RunSelfTestCore()
         {
             try
             {
@@ -142,13 +170,13 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
                 CryptoTool.ClearKey(key);
                 bool allOk = roundtripOk && wrongKeyRejected && tamperRejected && aadRejected;
-                _resultLabel.Text = (allOk ? "全部通过：roundtrip/错钥拒绝/篡改拒绝/域分隔拒绝"
+                return allOk ? "全部通过：roundtrip/错钥拒绝/篡改拒绝/域分隔拒绝"
                     : "自检未通过 roundtrip=" + roundtripOk + " 错钥拒绝=" + wrongKeyRejected
-                    + " 篡改拒绝=" + tamperRejected + " 域分隔拒绝=" + aadRejected);
+                    + " 篡改拒绝=" + tamperRejected + " 域分隔拒绝=" + aadRejected;
             }
             catch (Exception ex)
             {
-                _resultLabel.Text = "自检异常：" + ex.Message;
+                return "自检异常：" + ex.Message;
             }
         }
     }

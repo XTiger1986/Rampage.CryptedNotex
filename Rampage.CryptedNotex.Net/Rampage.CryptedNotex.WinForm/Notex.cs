@@ -44,6 +44,7 @@ namespace Rampage.CryptedNotex.WinForm
         private Label _typeLabel = null!;
         private Label _metaLabel = null!;
         private Label _editorMessage = null!;
+        private Label _emptyLabel = null!;
         private AttachmentPanel _attachmentPanel = null!;
         private Button _trashButton = null!;
         private Label _userLabel = null!;
@@ -52,10 +53,21 @@ namespace Rampage.CryptedNotex.WinForm
         private bool _editing;
         private bool _openForEdit;
         private Panel _frame = null!;
+        private Panel _statusBar = null!;
+        private Label _statusLabel = null!;
+        private Panel _statusProgressHost = null!;
         private SplitContainer _outerSplit = null!;
         private SplitContainer _innerSplit = null!;
         private ImageList? _categoryRowImages;
         private ImageList? _noteRowImages;
+        private int _statusBusy;
+        private int _listRequestId;
+        private int _noteRequestId;
+        private bool _suppressCategoryEvent;
+        private bool _closing;
+        private bool _announceNextSave;
+        private bool _suppressSearch;
+        private Task _saveQueue = Task.CompletedTask;
 
         private ContextMenuStrip _categoryMenu = null!;
         private ContextMenuStrip _noteMenu = null!;
@@ -69,6 +81,28 @@ namespace Rampage.CryptedNotex.WinForm
         {
             get;
             private set;
+        }
+
+        /// <summary>
+        /// 主窗体用底部状态条表示忙碌
+        /// </summary>
+        protected override bool UsesBusyBanner
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 提示条让出状态条
+        /// </summary>
+        protected override int ToastBottomMargin
+        {
+            get
+            {
+                return 46;
+            }
         }
 
         /// <summary>
@@ -145,20 +179,30 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 加载：读偏好、装分类、恢复上次笔记、启动自动锁定
         /// </summary>
-        protected override void OnLoad(EventArgs e)
+        protected override async void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            _userSetting = GetService<IUserSettingService>().GetUserSetting(_session.User!.Id);
-            ApplyFramePadding();
-            ApplyEditorFonts();
-            Internal.Themes.ThemeManager.CurrentChanged += OnThemeChanged;
+            try
+            {
+                _userSetting = GetService<IUserSettingService>().GetUserSetting(_session.User!.Id);
+                ApplyFramePadding();
+                ApplyEditorFonts();
+                Internal.Themes.ThemeManager.CurrentChanged += OnThemeChanged;
 
-            _autoLock = new AutoLockManager();
-            _autoLock.UpdateSettings(_userSetting.AutoLockMinutes);
-            _autoLock.AutoLockRequested += OnAutoLockRequested;
+                _autoLock = new AutoLockManager();
+                _autoLock.UpdateSettings(_userSetting.AutoLockMinutes);
+                _autoLock.AutoLockRequested += OnAutoLockRequested;
 
-            LoadCategories();
-            TryRestoreLastNote();
+                LoadCategories();
+                if (!await TryRestoreLastNoteAsync())
+                {
+                    await ReloadNotesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowToast("加载失败：" + ex.Message, ToastKind.Error);
+            }
         }
 
         /// <summary>
@@ -166,6 +210,13 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            if (_closing)
+            {
+                base.OnFormClosing(e);
+                return;
+            }
+
+            _closing = true;
             FlushEditorPendingSave();
             _autoLock?.Dispose();
             _categoryRowImages?.Dispose();
@@ -236,6 +287,49 @@ namespace Rampage.CryptedNotex.WinForm
             BuildSidebar(_outerSplit.Panel1);
             BuildContentArea(_outerSplit.Panel2);
             _frame.Controls.Add(_outerSplit);
+
+            _statusBar = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 32,
+                Padding = new Padding(12, 0, 12, 0),
+                Tag = "theme:chrome"
+            };
+            _statusProgressHost = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 128,
+                Visible = false,
+                Padding = new Padding(0, 11, 12, 11)
+            };
+            ProgressBar statusProgress = new ProgressBar
+            {
+                Dock = DockStyle.Fill,
+                Style = ProgressBarStyle.Marquee,
+                MarqueeAnimationSpeed = 24
+            };
+            _statusProgressHost.Controls.Add(statusProgress);
+            _statusLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "就绪",
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoEllipsis = true,
+                Tag = "theme:muted"
+            };
+            Label shortcutHint = new Label
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                Text = "Ctrl+F 搜索",
+                TextAlign = ContentAlignment.MiddleRight,
+                Tag = "theme:muted",
+                Padding = new Padding(12, 8, 0, 0)
+            };
+            _statusBar.Controls.Add(_statusLabel);
+            _statusBar.Controls.Add(_statusProgressHost);
+            _statusBar.Controls.Add(shortcutHint);
+            _frame.Controls.Add(_statusBar);
             Controls.Add(_frame);
         }
 
@@ -259,10 +353,10 @@ namespace Rampage.CryptedNotex.WinForm
                 RowCount = 4,
                 Margin = new Padding(0)
             };
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 104F));
             panel.Controls.Add(grid);
 
             Panel brand = new Panel
@@ -277,31 +371,21 @@ namespace Rampage.CryptedNotex.WinForm
             FlowLayoutPanel topPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(6, 4, 6, 2),
+                Padding = new Padding(8, 6, 8, 4),
                 WrapContents = false,
                 Margin = new Padding(0),
                 Tag = "theme:chrome"
             };
-            Button newCategoryButton = new Button
-            {
-                Text = "新建分类",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button newCategoryButton = UiFactory.Button("新建分类", "theme:accent");
             newCategoryButton.Click += (sender, e) => CreateCategory();
             topPanel.Controls.Add(newCategoryButton);
 
-            _trashButton = new Button
-            {
-                Text = "回收站",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            _trashButton = UiFactory.Button("回收站");
             _trashButton.Click += (sender, e) => ToggleTrashView();
             topPanel.Controls.Add(_trashButton);
             grid.Controls.Add(topPanel, 0, 1);
 
-            _categoryRowImages = new ImageList { ImageSize = new Size(1, 32) };
+            _categoryRowImages = new ImageList { ImageSize = new Size(1, 36) };
             _categoryList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -316,6 +400,8 @@ namespace Rampage.CryptedNotex.WinForm
                 SmallImageList = _categoryRowImages
             };
             _categoryList.Columns.Add("分类", 200);
+            _categoryList.Font = new Font("Microsoft YaHei UI", 9.5F);
+            UiFactory.EnableDoubleBuffer(_categoryList);
             _categoryList.DrawItem += SuppressListItemDraw;
             _categoryList.DrawSubItem += CategoryDrawSubItem;
             _categoryList.DrawColumnHeader += (sender, e) => e.DrawDefault = true;
@@ -328,7 +414,7 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 2,
-                Padding = new Padding(6),
+                Padding = new Padding(8),
                 Margin = new Padding(0),
                 Tag = "theme:chrome"
             };
@@ -337,21 +423,17 @@ namespace Rampage.CryptedNotex.WinForm
             bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
-            Button settingsButton = new Button
-            {
-                Text = "设置",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(2)
-            };
+            Button settingsButton = UiFactory.Button("设置");
+            settingsButton.AutoSize = false;
+            settingsButton.Dock = DockStyle.Fill;
+            settingsButton.Margin = new Padding(4);
             settingsButton.Click += (sender, e) => OpenSettings();
             bottomPanel.Controls.Add(settingsButton, 0, 0);
 
-            Button aboutButton = new Button
-            {
-                Text = "关于",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(2)
-            };
+            Button aboutButton = UiFactory.Button("关于");
+            aboutButton.AutoSize = false;
+            aboutButton.Dock = DockStyle.Fill;
+            aboutButton.Margin = new Padding(4);
             aboutButton.Click += (sender, e) =>
             {
                 using (AboutForm form = new AboutForm(App))
@@ -366,16 +448,16 @@ namespace Rampage.CryptedNotex.WinForm
                 Text = _session.User?.DisplayName ?? string.Empty,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(6, 0, 0, 0),
+                AutoEllipsis = true,
                 Tag = "theme:muted"
             };
             bottomPanel.Controls.Add(_userLabel, 0, 1);
 
-            Button logoutButton = new Button
-            {
-                Text = "登出",
-                Dock = DockStyle.Fill,
-                Margin = new Padding(2)
-            };
+            Button logoutButton = UiFactory.Button("登出");
+            logoutButton.AutoSize = false;
+            logoutButton.Dock = DockStyle.Fill;
+            logoutButton.Margin = new Padding(4);
             logoutButton.Click += (sender, e) =>
             {
                 FlushEditorPendingSave();
@@ -415,19 +497,23 @@ namespace Rampage.CryptedNotex.WinForm
                 ColumnCount = 1,
                 RowCount = 3
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             _searchBox = new TextBox
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei UI", 9.5F),
-                Margin = new Padding(8, 8, 8, 2),
-                PlaceholderText = "按标题搜索 (Ctrl+F)"
+                Font = new Font("Microsoft YaHei UI", 10.5F),
+                Margin = new Padding(12, 10, 12, 6),
+                PlaceholderText = "搜索标题    Ctrl+F"
             };
             _searchBox.TextChanged += (sender, e) =>
             {
+                if (_suppressSearch)
+                {
+                    return;
+                }
                 _searchTimer ??= new Timer
                 {
                     Interval = 300
@@ -444,8 +530,8 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 WrapContents = false,
-                Margin = new Padding(6, 2, 6, 2),
-                Padding = new Padding(2, 2, 2, 0),
+                Margin = new Padding(8, 2, 8, 2),
+                Padding = new Padding(4, 4, 4, 0),
                 Tag = "theme:chrome"
             };
             BuildNormalToolbar(_normalToolbar);
@@ -456,15 +542,15 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 WrapContents = false,
-                Margin = new Padding(6, 2, 6, 2),
-                Padding = new Padding(2, 2, 2, 0),
+                Margin = new Padding(8, 2, 8, 2),
+                Padding = new Padding(4, 4, 4, 0),
                 Visible = false,
                 Tag = "theme:chrome"
             };
             BuildTrashToolbar(_trashToolbar);
             layout.Controls.Add(_trashToolbar, 0, 1);
 
-            _noteRowImages = new ImageList { ImageSize = new Size(1, 30) };
+            _noteRowImages = new ImageList { ImageSize = new Size(1, 34) };
             _noteList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -476,11 +562,13 @@ namespace Rampage.CryptedNotex.WinForm
                 BorderStyle = BorderStyle.None,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
                 SmallImageList = _noteRowImages,
-                Margin = new Padding(6, 2, 6, 6)
+                Margin = new Padding(8, 0, 8, 8)
             };
             _noteList.Columns.Add("标题", 160);
             _noteList.Columns.Add("修改时间", 108);
             _noteList.Columns.Add("字数", 56);
+            _noteList.Font = new Font("Microsoft YaHei UI", 9.5F);
+            UiFactory.EnableDoubleBuffer(_noteList);
             _noteList.Resize += (sender, e) => FitNoteColumns();
             _noteList.DrawItem += SuppressListItemDraw;
             _noteList.DrawSubItem += NoteListDrawSubItem;
@@ -488,7 +576,25 @@ namespace Rampage.CryptedNotex.WinForm
             _noteList.SelectedIndexChanged += OnNoteSelected;
             _noteList.MouseUp += NoteListMouseUp;
             _noteList.DoubleClick += (sender, e) => EnterEdit();
-            layout.Controls.Add(_noteList, 0, 2);
+
+            Panel listHost = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(8, 0, 8, 8),
+                Tag = "theme:panelAlt"
+            };
+            _emptyLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "这个分类还没有笔记",
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Microsoft YaHei UI", 11F),
+                Tag = "theme:muted",
+                Visible = false
+            };
+            listHost.Controls.Add(_noteList);
+            listHost.Controls.Add(_emptyLabel);
+            layout.Controls.Add(listHost, 0, 2);
             panel.Controls.Add(layout);
         }
 
@@ -497,12 +603,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildNormalToolbar(Panel panel)
         {
-            Button newNoteButton = new Button
-            {
-                Text = "新建笔记",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button newNoteButton = UiFactory.Button("新建笔记", "theme:accent");
             newNoteButton.Click += (sender, e) =>
             {
                 Point location = newNoteButton.PointToScreen(new Point(0, newNoteButton.Height));
@@ -510,21 +611,11 @@ namespace Rampage.CryptedNotex.WinForm
             };
             panel.Controls.Add(newNoteButton);
 
-            Button pinButton = new Button
-            {
-                Text = "置顶",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button pinButton = UiFactory.Button("置顶");
             pinButton.Click += (sender, e) => TogglePinned();
             panel.Controls.Add(pinButton);
 
-            Button trashButton = new Button
-            {
-                Text = "删除",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button trashButton = UiFactory.Button("删除");
             trashButton.Click += (sender, e) => TrashSelectedNote();
             panel.Controls.Add(trashButton);
         }
@@ -534,31 +625,15 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildTrashToolbar(Panel panel)
         {
-            Button restoreButton = new Button
-            {
-                Text = "恢复",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button restoreButton = UiFactory.Button("恢复");
             restoreButton.Click += (sender, e) => RestoreSelectedNote();
             panel.Controls.Add(restoreButton);
 
-            Button purgeButton = new Button
-            {
-                Text = "彻底删除",
-                AutoSize = true,
-                Margin = new Padding(2),
-                Tag = "theme:danger"
-            };
+            Button purgeButton = UiFactory.Button("彻底删除", "theme:danger");
             purgeButton.Click += (sender, e) => PurgeSelectedNote();
             panel.Controls.Add(purgeButton);
 
-            Button emptyButton = new Button
-            {
-                Text = "清空回收站",
-                AutoSize = true,
-                Margin = new Padding(2)
-            };
+            Button emptyButton = UiFactory.Button("清空回收站");
             emptyButton.Click += (sender, e) => EmptyTrash();
             panel.Controls.Add(emptyButton);
         }
@@ -574,24 +649,24 @@ namespace Rampage.CryptedNotex.WinForm
                 ColumnCount = 1,
                 RowCount = 3
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58F));
 
             TableLayoutPanel headerPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                Margin = new Padding(8, 8, 8, 0)
+                Margin = new Padding(12, 12, 12, 0)
             };
-            headerPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            headerPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
             headerPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             _titleBox = new TextBox
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei UI", 12F),
+                Font = new Font("Microsoft YaHei UI", 13.5F),
                 BorderStyle = BorderStyle.FixedSingle,
                 PlaceholderText = "无标题(标题为明文,敏感信息请写正文)"
             };
@@ -610,7 +685,8 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 Text = string.Empty,
                 AutoSize = true,
-                Padding = new Padding(0, 4, 12, 0),
+                Padding = new Padding(0, 6, 12, 0),
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 Tag = "theme:link"
             };
             metaRow.Controls.Add(_typeLabel);
@@ -629,6 +705,8 @@ namespace Rampage.CryptedNotex.WinForm
                 Text = "编辑",
                 AutoSize = true,
                 Enabled = false,
+                MinimumSize = new Size(72, 30),
+                Padding = new Padding(12, 2, 12, 2),
                 Margin = new Padding(16, 0, 0, 0),
                 Tag = "theme:accent"
             };
@@ -640,8 +718,9 @@ namespace Rampage.CryptedNotex.WinForm
             _editorHost = new Panel
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(6, 4, 6, 2),
-                Padding = new Padding(1)
+                Margin = new Padding(12, 6, 12, 4),
+                Padding = new Padding(0),
+                Tag = "theme:editor"
             };
 
             _editorMessage = new Label
@@ -649,6 +728,7 @@ namespace Rampage.CryptedNotex.WinForm
                 Text = string.Empty,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Microsoft YaHei UI", 12F),
                 Tag = "theme:muted",
                 Visible = false
             };
@@ -657,7 +737,7 @@ namespace Rampage.CryptedNotex.WinForm
 
             _attachmentPanel = new AttachmentPanel
             {
-                Margin = new Padding(6, 0, 6, 6)
+                Margin = new Padding(12, 0, 12, 8)
             };
             _attachmentPanel.AddAttachmentRequested += (sender, e) => AddAttachment();
             _attachmentPanel.OpenAttachmentRequested += (sender, attachment) => OpenAttachment(attachment);
@@ -707,21 +787,41 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void LoadCategories()
         {
+            int selectedId = _currentCategory?.Id ?? 0;
             _categories = GetService<ICategoryService>().GetCategoryList(_session.User!.Id);
-            _categoryList.BeginUpdate();
-            _categoryList.Items.Clear();
-            foreach (Category category in _categories)
+            _suppressCategoryEvent = true;
+            try
             {
-                ListViewItem item = new ListViewItem(category.Name)
+                _categoryList.BeginUpdate();
+                _categoryList.Items.Clear();
+                int selectIndex = 0;
+                for (int i = 0; i < _categories.Count; i++)
                 {
-                    Tag = category
-                };
-                _categoryList.Items.Add(item);
+                    Category category = _categories[i];
+                    ListViewItem item = new ListViewItem(category.Name)
+                    {
+                        Tag = category
+                    };
+                    _categoryList.Items.Add(item);
+                    if (selectedId > 0 && category.Id == selectedId)
+                    {
+                        selectIndex = i;
+                    }
+                }
+                _categoryList.EndUpdate();
+                if (_categoryList.Items.Count > 0)
+                {
+                    _categoryList.SelectedIndices.Add(selectIndex);
+                    _currentCategory = (Category)_categoryList.Items[selectIndex].Tag!;
+                }
+                else
+                {
+                    _currentCategory = null;
+                }
             }
-            _categoryList.EndUpdate();
-            if (_categoryList.Items.Count > 0 && _categoryList.SelectedIndices.Count == 0)
+            finally
             {
-                _categoryList.SelectedIndices.Add(0);
+                _suppressCategoryEvent = false;
             }
         }
 
@@ -736,8 +836,13 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 切换分类
         /// </summary>
-        private void OnCategorySelected(object? sender, EventArgs e)
+        private async void OnCategorySelected(object? sender, EventArgs e)
         {
+            if (_suppressCategoryEvent || _closing)
+            {
+                return;
+            }
+
             Category? category = SelectedCategory();
             if (category == null || ReferenceEquals(category, _currentCategory))
             {
@@ -748,7 +853,7 @@ namespace Rampage.CryptedNotex.WinForm
             _trashView = false;
             SyncViewMode();
             _currentCategory = category;
-            ReloadNotes();
+            await ReloadNotesAsync();
         }
 
         /// <summary>
@@ -800,10 +905,11 @@ namespace Rampage.CryptedNotex.WinForm
                 R result = GetService<ICategoryService>().SaveCategory(category);
                 if (!result.IsSuccess)
                 {
-                    MessageBox.Show(result.Message ?? "创建失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast(result.Message ?? "创建失败", ToastKind.Error);
                     return;
                 }
                 LoadCategories();
+                ShowToast("已创建分类「" + form.CategoryName + "」", ToastKind.Success);
             }
         }
 
@@ -828,17 +934,18 @@ namespace Rampage.CryptedNotex.WinForm
                 R result = GetService<ICategoryService>().SaveCategory(category);
                 if (!result.IsSuccess)
                 {
-                    MessageBox.Show(result.Message ?? "重命名失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast(result.Message ?? "重命名失败", ToastKind.Error);
                     return;
                 }
                 LoadCategories();
+                ShowToast("已重命名分类", ToastKind.Success);
             }
         }
 
         /// <summary>
         /// 删除分类(其下笔记移入默认分类)
         /// </summary>
-        private void DeleteCategory()
+        private async void DeleteCategory()
         {
             Category? category = SelectedCategory();
             if (category == null)
@@ -847,7 +954,7 @@ namespace Rampage.CryptedNotex.WinForm
             }
             if (category.IsDefault == 1)
             {
-                MessageBox.Show("默认分类不可删除", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowToast("默认分类不可删除", ToastKind.Info);
                 return;
             }
 
@@ -860,15 +967,18 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             FlushEditorPendingSave();
+            string name = category.Name;
             R result = GetService<ICategoryService>().RemoveCategory(_session.User!.Id, category.Id, true);
             if (!result.IsSuccess)
             {
-                MessageBox.Show(result.Message ?? "删除失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast(result.Message ?? "删除失败", ToastKind.Error);
                 return;
             }
             _currentCategory = null;
             LoadCategories();
-            ReloadNotes();
+            ClearEditor();
+            await ReloadNotesAsync();
+            ShowToast("已删除分类「" + name + "」", ToastKind.Success);
         }
 
         /// <summary>
@@ -918,12 +1028,12 @@ namespace Rampage.CryptedNotex.WinForm
                 string confirm = form.Values[1];
                 if (password.Length < 6)
                 {
-                    MessageBox.Show("独立密码至少 6 位", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast("独立密码至少 6 位", ToastKind.Error);
                     return;
                 }
                 if (password != confirm)
                 {
-                    MessageBox.Show("两次输入不一致", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast("两次输入不一致", ToastKind.Error);
                     return;
                 }
 
@@ -936,7 +1046,7 @@ namespace Rampage.CryptedNotex.WinForm
                             _session.User!.Id, category.Id, password, _session.GetUserContentKey(), progress));
                     if (!result.IsSuccess)
                     {
-                        MessageBox.Show(result.Message ?? "设置失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ShowToast(result.Message ?? "设置失败", ToastKind.Error);
                         return;
                     }
                     if (result.Data is byte[] categoryKey)
@@ -944,6 +1054,7 @@ namespace Rampage.CryptedNotex.WinForm
                         _session.MarkCategoryUnlocked(category.Id, categoryKey);
                     }
                     LoadCategories();
+                    ShowToast("已设置独立密码，该分类笔记已重新加密。", ToastKind.Success);
                 }
                 finally
                 {
@@ -973,7 +1084,7 @@ namespace Rampage.CryptedNotex.WinForm
                 }
                 if (form.Values[1] != form.Values[2])
                 {
-                    MessageBox.Show("两次输入的新密码不一致", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast("两次输入的新密码不一致", ToastKind.Error);
                     return;
                 }
 
@@ -986,13 +1097,14 @@ namespace Rampage.CryptedNotex.WinForm
                             _session.User!.Id, category.Id, form.Values[0], form.Values[1], progress));
                     if (!result.IsSuccess)
                     {
-                        MessageBox.Show(result.Message ?? "重置失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ShowToast(result.Message ?? "重置失败", ToastKind.Error);
                         return;
                     }
                     if (result.Data is byte[] categoryKey)
                     {
                         _session.ReplaceCategoryKey(category.Id, categoryKey);
                     }
+                    ShowToast("独立密码已重置，笔记已重新加密。", ToastKind.Success);
                 }
                 finally
                 {
@@ -1030,10 +1142,11 @@ namespace Rampage.CryptedNotex.WinForm
                             _session.User!.Id, category.Id, form.Values[0], _session.GetUserContentKey(), progress));
                     if (!result.IsSuccess)
                     {
-                        MessageBox.Show(result.Message ?? "切换失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ShowToast(result.Message ?? "切换失败", ToastKind.Error);
                         return;
                     }
                     LoadCategories();
+                    ShowToast("已改回跟随登录密码，笔记已重新加密。", ToastKind.Success);
                 }
                 finally
                 {
@@ -1049,33 +1162,97 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 重载当前视图的笔记列表(分类视图/搜索视图/回收站视图)
         /// </summary>
-        private void ReloadNotes()
+        private async Task ReloadNotesAsync()
         {
+            int requestId = ++_listRequestId;
             int userId = _session.User!.Id;
-            if (_trashView)
+            bool trash = _trashView;
+            string keyword = _searchKeyword;
+            int? categoryId = _currentCategory?.Id;
+            string busy = keyword.Length > 0 ? "正在搜索…" : trash ? "正在加载回收站…" : "正在加载笔记…";
+            PushStatus(busy);
+            try
             {
-                _notes = GetService<INoteService>().GetTrashList(userId);
+                List<Note> notes = await UiWork.RunAsync(() => QueryNotes(userId, trash, keyword, categoryId));
+                if (IsDisposed || requestId != _listRequestId)
+                {
+                    return;
+                }
+                _notes = notes;
+                FillNoteList(notes);
             }
-            else if (_searchKeyword.Length > 0)
+            catch (Exception ex)
             {
-                _notes = GetService<INoteService>().SearchByTitleList(userId, _searchKeyword);
+                if (!IsDisposed && requestId == _listRequestId)
+                {
+                    ShowToast("加载笔记失败：" + ex.Message, ToastKind.Error);
+                }
             }
-            else if (_currentCategory != null)
+            finally
             {
-                _notes = GetService<INoteService>().GetNoteList(userId, _currentCategory.Id);
+                if (!IsDisposed)
+                {
+                    PopStatus();
+                }
             }
-            else
-            {
-                _notes = new List<Note>();
-            }
+        }
 
+        /// <summary>
+        /// 按当前视图取笔记列表(可在后台线程调用)
+        /// </summary>
+        private List<Note> QueryNotes(int userId, bool trash, string keyword, int? categoryId)
+        {
+            if (trash)
+            {
+                return GetService<INoteService>().GetTrashList(userId);
+            }
+            if (keyword.Length > 0)
+            {
+                return GetService<INoteService>().SearchByTitleList(userId, keyword);
+            }
+            if (categoryId.HasValue)
+            {
+                return GetService<INoteService>().GetNoteList(userId, categoryId.Value);
+            }
+            return new List<Note>();
+        }
+
+        /// <summary>
+        /// 把笔记填进列表，空列表换成说明
+        /// </summary>
+        private void FillNoteList(List<Note> notes)
+        {
             _noteList.BeginUpdate();
             _noteList.Items.Clear();
-            foreach (Note note in _notes)
+            foreach (Note note in notes)
             {
                 _noteList.Items.Add(BuildNoteItem(note));
             }
             _noteList.EndUpdate();
+            bool empty = notes.Count == 0;
+            _noteList.Visible = !empty;
+            _emptyLabel.Visible = empty;
+            _emptyLabel.Text = EmptyNoteText();
+            if (!empty)
+            {
+                FitNoteColumns();
+            }
+        }
+
+        /// <summary>
+        /// 空列表文案
+        /// </summary>
+        private string EmptyNoteText()
+        {
+            if (_searchKeyword.Length > 0)
+            {
+                return "没有标题包含「" + _searchKeyword + "」的笔记";
+            }
+            if (_trashView)
+            {
+                return "回收站是空的";
+            }
+            return "这个分类还没有笔记";
         }
 
         /// <summary>
@@ -1096,7 +1273,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 进入默认分类(Ctrl+1)。已选中时仍退出回收站并刷新。
         /// </summary>
-        private void ActivateDefaultCategory()
+        private async void ActivateDefaultCategory()
         {
             FlushEditorPendingSave();
             bool wasTrash = _trashView;
@@ -1121,7 +1298,7 @@ namespace Rampage.CryptedNotex.WinForm
                 if (wasTrash)
                 {
                     _currentCategory = (Category)target.Tag!;
-                    ReloadNotes();
+                    await ReloadNotesAsync();
                 }
                 return;
             }
@@ -1186,6 +1363,10 @@ namespace Rampage.CryptedNotex.WinForm
                 textRect,
                 Internal.Themes.ThemeManager.GetColor("text"),
                 TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            using (Pen separator = new Pen(Internal.Themes.ThemeManager.GetColor("border")))
+            {
+                e.Graphics.DrawLine(separator, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+            }
         }
 
         /// <summary>
@@ -1256,6 +1437,13 @@ namespace Rampage.CryptedNotex.WinForm
                 textRect,
                 fore,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if (e.ColumnIndex == _noteList.Columns.Count - 1)
+            {
+                using (Pen separator = new Pen(Internal.Themes.ThemeManager.GetColor("border")))
+                {
+                    e.Graphics.DrawLine(separator, 0, e.Bounds.Bottom - 1, _noteList.ClientSize.Width, e.Bounds.Bottom - 1);
+                }
+            }
         }
 
         /// <summary>
@@ -1308,7 +1496,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 搜索防抖到点
         /// </summary>
-        private void SearchTimerTick(object? sender, EventArgs e)
+        private async void SearchTimerTick(object? sender, EventArgs e)
         {
             _searchTimer?.Stop();
             _searchKeyword = _searchBox.Text.Trim();
@@ -1318,23 +1506,24 @@ namespace Rampage.CryptedNotex.WinForm
                 _trashView = false;
                 SyncViewMode();
             }
-            ReloadNotes();
+            await ReloadNotesAsync();
         }
 
         /// <summary>
         /// 切换回收站视图
         /// </summary>
-        private void ToggleTrashView()
+        private async void ToggleTrashView()
         {
             FlushEditorPendingSave();
             _trashView = !_trashView;
             if (_trashView)
             {
                 _searchKeyword = string.Empty;
-                _searchBox.Text = string.Empty;
+                SetSearchText(string.Empty);
             }
             SyncViewMode();
-            ReloadNotes();
+            ClearEditor();
+            await ReloadNotesAsync();
         }
 
         /// <summary>
@@ -1387,28 +1576,40 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 选中笔记：解锁校验→读取解密→装载编辑器
         /// </summary>
-        private void OnNoteSelected(object? sender, EventArgs e)
+        private async void OnNoteSelected(object? sender, EventArgs e)
         {
+            if (_closing)
+            {
+                return;
+            }
+
             Note? note = SelectedNote();
             if (note == null || ReferenceEquals(note, _currentNote))
             {
                 return;
             }
-            OpenNote(note);
+            await OpenNoteAsync(note);
         }
 
         /// <summary>
-        /// 打开笔记(解锁/解密/装载)
+        /// 打开笔记(解锁/解密/装载)。解密在后台进行，过期的打开请求会被丢掉。
         /// </summary>
-        private void OpenNote(Note note)
+        private async Task OpenNoteAsync(Note note)
         {
+            int requestId = ++_noteRequestId;
             bool edit = _openForEdit && !_trashView;
             _openForEdit = false;
             FlushEditorPendingSave();
+            if (IsDisposed || requestId != _noteRequestId)
+            {
+                return;
+            }
+
             Category? category = FindCategory(note.CategoryId);
             if (category == null)
             {
                 ShowEditorMessage("笔记所属分类不存在");
+                ShowToast("笔记所属分类不存在", ToastKind.Error);
                 return;
             }
 
@@ -1428,11 +1629,40 @@ namespace Rampage.CryptedNotex.WinForm
                 contentKey = _session.GetContentKey(category);
             }
 
-            R<NoteDetailDto> detail = GetService<INoteService>().GetNoteDetail(note.Id, contentKey);
+            if (IsDisposed || requestId != _noteRequestId)
+            {
+                return;
+            }
+
+            string title = note.Title.Length == 0 ? "无标题" : note.Title;
+            ShowEditorMessage("正在解密「" + title + "」…");
+            R<NoteDetailDto> detail;
+            try
+            {
+                detail = await RunMainAsync("正在解密「" + title + "」…", () => GetService<INoteService>().GetNoteDetail(note.Id, contentKey));
+            }
+            catch (Exception ex)
+            {
+                if (IsDisposed || requestId != _noteRequestId)
+                {
+                    return;
+                }
+                ShowEditorMessage("读取失败");
+                ShowToast("读取失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
+
+            if (IsDisposed || requestId != _noteRequestId)
+            {
+                return;
+            }
+
             if (!detail.IsSuccess || detail.Data == null)
             {
                 _currentNote = null;
-                ShowEditorMessage(detail.Message ?? "读取失败");
+                string message = detail.Message ?? "读取失败";
+                ShowEditorMessage(message);
+                ShowToast(message, ToastKind.Error);
                 return;
             }
 
@@ -1487,7 +1717,9 @@ namespace Rampage.CryptedNotex.WinForm
                 return;
             }
 
+            _announceNextSave = true;
             FlushEditorPendingSave();
+            _announceNextSave = false;
             ApplyReadingMode(false);
         }
 
@@ -1528,7 +1760,7 @@ namespace Rampage.CryptedNotex.WinForm
                     _session.MarkCategoryUnlocked(category.Id, categoryKey);
                     return true;
                 }
-                MessageBox.Show("独立密码错误", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast("独立密码错误", ToastKind.Error);
                 return false;
             }
         }
@@ -1544,11 +1776,11 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 新建笔记
         /// </summary>
-        private void CreateNote(ContentType contentType)
+        private async void CreateNote(ContentType contentType)
         {
             if (_currentCategory == null)
             {
-                MessageBox.Show("请先选择分类", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowToast("请先选择分类", ToastKind.Info);
                 return;
             }
             Category category = _currentCategory;
@@ -1571,7 +1803,7 @@ namespace Rampage.CryptedNotex.WinForm
                 SyncViewMode();
             }
             _searchKeyword = string.Empty;
-            _searchBox.Text = string.Empty;
+            SetSearchText(string.Empty);
 
             Note note = new Note
             {
@@ -1580,14 +1812,24 @@ namespace Rampage.CryptedNotex.WinForm
                 Title = string.Empty,
                 ContentType = (int)contentType
             };
-            R result = GetService<INoteService>().SaveNote(note, string.Empty, _session.GetContentKey(category));
+            byte[] contentKey = _session.GetContentKey(category);
+            R result;
+            try
+            {
+                result = await RunMainAsync("正在创建笔记…", () => GetService<INoteService>().SaveNote(note, string.Empty, contentKey));
+            }
+            catch (Exception ex)
+            {
+                ShowToast("创建失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (!result.IsSuccess)
             {
-                MessageBox.Show(result.Message ?? "创建失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast(result.Message ?? "创建失败", ToastKind.Error);
                 return;
             }
 
-            ReloadNotes();
+            await ReloadNotesAsync();
             _openForEdit = true;
             foreach (ListViewItem item in _noteList.Items)
             {
@@ -1598,54 +1840,81 @@ namespace Rampage.CryptedNotex.WinForm
                 }
             }
             _titleBox.Focus();
+            ShowToast("已创建" + TypeName(contentType) + "笔记", ToastKind.Success);
         }
 
         /// <summary>
         /// 置顶/取消置顶
         /// </summary>
-        private void TogglePinned()
+        private async void TogglePinned()
         {
             Note? note = SelectedNote() ?? _currentNote;
             if (note == null)
             {
+                ShowToast("请先选择一条笔记", ToastKind.Info);
                 return;
             }
-            GetService<INoteService>().UpdatePinned(note.Id, note.IsPinned != 1);
-            ReloadNotes();
-            foreach (ListViewItem item in _noteList.Items)
+            bool pin = note.IsPinned != 1;
+            try
             {
-                if (((Note)item.Tag!).Id == note.Id)
+                R result = await RunMainAsync(pin ? "正在置顶…" : "正在取消置顶…", () => GetService<INoteService>().UpdatePinned(note.Id, pin));
+                if (!result.IsSuccess)
                 {
-                    item.Selected = true;
-                    break;
+                    ShowToast(result.Message ?? "更新失败", ToastKind.Error);
+                    return;
                 }
             }
+            catch (Exception ex)
+            {
+                ShowToast("更新失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
+            note.IsPinned = pin ? 1 : 0;
+            await ReloadNotesAsync();
+            SelectNote(note.Id);
+            ShowToast(pin ? "已置顶" : "已取消置顶", ToastKind.Success);
         }
 
         /// <summary>
         /// 移入回收站
         /// </summary>
-        private void TrashSelectedNote()
+        private async void TrashSelectedNote()
         {
             Note? note = SelectedNote();
             if (note == null)
             {
+                ShowToast("请先选择一条笔记", ToastKind.Info);
                 return;
             }
 
             FlushEditorPendingSave();
-            GetService<INoteService>().MoveToTrashList(new List<int> { note.Id }, _session.User!.Id);
+            int userId = _session.User!.Id;
+            int noteId = note.Id;
+            try
+            {
+                await RunMainAsync("正在移入回收站…", () =>
+                {
+                    GetService<INoteService>().MoveToTrashList(new List<int> { noteId }, userId);
+                    return true;
+                });
+            }
+            catch (Exception ex)
+            {
+                ShowToast("移入回收站失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (ReferenceEquals(note, _currentNote))
             {
                 ClearEditor();
             }
-            ReloadNotes();
+            await ReloadNotesAsync();
+            ShowToast("已移入回收站", ToastKind.Success);
         }
 
         /// <summary>
         /// 从回收站恢复
         /// </summary>
-        private void RestoreSelectedNote()
+        private async void RestoreSelectedNote()
         {
             Note? note = SelectedNote();
             if (note == null)
@@ -1654,18 +1923,33 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             FlushEditorPendingSave();
-            GetService<INoteService>().RestoreList(new List<int> { note.Id }, _session.User!.Id);
+            int userId = _session.User!.Id;
+            int noteId = note.Id;
+            try
+            {
+                await RunMainAsync("正在恢复…", () =>
+                {
+                    GetService<INoteService>().RestoreList(new List<int> { noteId }, userId);
+                    return true;
+                });
+            }
+            catch (Exception ex)
+            {
+                ShowToast("恢复失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (ReferenceEquals(note, _currentNote))
             {
                 ClearEditor();
             }
-            ReloadNotes();
+            await ReloadNotesAsync();
+            ShowToast("已恢复笔记", ToastKind.Success);
         }
 
         /// <summary>
         /// 彻底删除(附件级联)
         /// </summary>
-        private void PurgeSelectedNote()
+        private async void PurgeSelectedNote()
         {
             Note? note = SelectedNote();
             if (note == null)
@@ -1682,18 +1966,33 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             FlushEditorPendingSave();
-            GetService<INoteService>().PurgeList(new List<int> { note.Id }, _session.User!.Id);
+            int userId = _session.User!.Id;
+            int noteId = note.Id;
+            try
+            {
+                await RunMainAsync("正在彻底删除…", () =>
+                {
+                    GetService<INoteService>().PurgeList(new List<int> { noteId }, userId);
+                    return true;
+                });
+            }
+            catch (Exception ex)
+            {
+                ShowToast("彻底删除失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (ReferenceEquals(note, _currentNote))
             {
                 ClearEditor();
             }
-            ReloadNotes();
+            await ReloadNotesAsync();
+            ShowToast("已彻底删除", ToastKind.Success);
         }
 
         /// <summary>
         /// 清空回收站
         /// </summary>
-        private void EmptyTrash()
+        private async void EmptyTrash()
         {
             DialogResult choice = MessageBox.Show("清空回收站？其中全部笔记及附件将被彻底删除,不可恢复。",
                 Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
@@ -1703,9 +2002,23 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             FlushEditorPendingSave();
-            GetService<INoteService>().EmptyTrash(_session.User!.Id);
+            int userId = _session.User!.Id;
+            try
+            {
+                await RunMainAsync("正在清空回收站…", () =>
+                {
+                    GetService<INoteService>().EmptyTrash(userId);
+                    return true;
+                });
+            }
+            catch (Exception ex)
+            {
+                ShowToast("清空失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             ClearEditor();
-            ReloadNotes();
+            await ReloadNotesAsync();
+            ShowToast("回收站已清空", ToastKind.Success);
         }
 
         /// <summary>
@@ -1722,30 +2035,56 @@ namespace Rampage.CryptedNotex.WinForm
         }
 
         /// <summary>
-        /// 登录后恢复上次打开的笔记
+        /// 登录后恢复上次打开的笔记。返回 false 表示没有可恢复的笔记。
         /// </summary>
-        private void TryRestoreLastNote()
+        private async Task<bool> TryRestoreLastNoteAsync()
         {
             if (_userSetting.LastNoteId <= 0)
             {
-                return;
+                return false;
             }
             Note? note = GetService<INoteService>().GetNoteById(_userSetting.LastNoteId);
             if (note == null || note.Status != (int)NoteStatus.Normal || note.UserId != _session.User!.Id)
             {
-                return;
+                return false;
             }
 
             int index = _categories.FindIndex(m => m.Id == note.CategoryId);
-            if (index >= 0)
+            if (index < 0)
             {
-                _categoryList.SelectedIndices.Add(index);
+                return false;
             }
+
+            _suppressCategoryEvent = true;
+            try
+            {
+                _categoryList.SelectedIndices.Clear();
+                _categoryList.SelectedIndices.Add(index);
+                _currentCategory = (Category)_categoryList.Items[index].Tag!;
+                _trashView = false;
+                SyncViewMode();
+            }
+            finally
+            {
+                _suppressCategoryEvent = false;
+            }
+
+            await ReloadNotesAsync();
+            SelectNote(note.Id);
+            return true;
+        }
+
+        /// <summary>
+        /// 按 Id 选中列表中的笔记
+        /// </summary>
+        private void SelectNote(int noteId)
+        {
             foreach (ListViewItem item in _noteList.Items)
             {
-                if (((Note)item.Tag!).Id == note.Id)
+                if (item.Tag is Note listed && listed.Id == noteId)
                 {
                     item.Selected = true;
+                    item.EnsureVisible();
                     break;
                 }
             }
@@ -1761,10 +2100,11 @@ namespace Rampage.CryptedNotex.WinForm
         private void FlushEditorPendingSave()
         {
             _activeEditor?.FlushPendingSave();
+            DrainSaveQueue();
         }
 
         /// <summary>
-        /// 保存当前笔记(标题+正文加密写库)
+        /// 保存当前笔记(标题+正文加密写库)。加密写库在后台排队，界面保持可重绘。
         /// </summary>
         private void SaveCurrentNote()
         {
@@ -1790,17 +2130,115 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             note.Title = _titleBox.Text.Trim();
-            string content = _activeEditor.CollectContent();
-            R result = GetService<INoteService>().SaveNote(note, content, contentKey);
-            if (!result.IsSuccess)
+            SaveSnapshot snapshot = new SaveSnapshot
             {
-                MessageBox.Show(result.Message ?? "保存失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Note = note,
+                Title = note.Title,
+                Content = _activeEditor.CollectContent(),
+                Key = contentKey,
+                WordCount = _activeEditor.GetWordCount(),
+                Announce = _announceNextSave
+            };
+            _announceNextSave = false;
+            if (ReferenceEquals(_currentNote, note))
+            {
+                _metaLabel.Text = "正在保存…";
+            }
+            Task previous = _saveQueue;
+            _saveQueue = PersistAsync(previous, snapshot);
+        }
+
+        /// <summary>
+        /// 等到已排队的保存结束。等待期间泵消息，让状态条动画继续走。
+        /// </summary>
+        private void DrainSaveQueue()
+        {
+            int spins = 0;
+            while (!_saveQueue.IsCompleted && spins < 20000)
+            {
+                Task observed = _saveQueue;
+                while (!observed.IsCompleted && spins < 20000)
+                {
+                    Application.DoEvents();
+                    System.Threading.Thread.Sleep(15);
+                    spins++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 串行保存一笔快照，避免和列表解密抢数据库
+        /// </summary>
+        private async Task PersistAsync(Task previous, SaveSnapshot snapshot)
+        {
+            try
+            {
+                await previous;
+            }
+            catch
+            {
+                // 上一笔的失败已经提示过
+            }
+
+            if (IsDisposed)
+            {
                 return;
             }
 
-            _activeEditor.MarkSaved();
-            _metaLabel.Text = "修改 " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + " · " + _activeEditor.GetWordCount() + " 字";
-            RefreshNoteItem(note);
+            PushStatus("正在保存…");
+            try
+            {
+                R result;
+                try
+                {
+                    result = await UiWork.RunAsync(() => GetService<INoteService>().SaveNote(snapshot.Note, snapshot.Content, snapshot.Key));
+                }
+                catch (Exception ex)
+                {
+                    result = R.Failure(ex.Message);
+                }
+
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                if (!result.IsSuccess)
+                {
+                    ShowToast(result.Message ?? "保存失败", ToastKind.Error);
+                    if (ReferenceEquals(_currentNote, snapshot.Note))
+                    {
+                        _metaLabel.Text = "保存失败";
+                    }
+                    return;
+                }
+
+                bool sameText = ReferenceEquals(_currentNote, snapshot.Note)
+                    && _activeEditor != null
+                    && _titleBox.Text.Trim() == snapshot.Title
+                    && _activeEditor.CollectContent() == snapshot.Content;
+                if (sameText)
+                {
+                    _activeEditor!.MarkSaved();
+                    _metaLabel.Text = "已保存 · " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + " · " + snapshot.WordCount + " 字";
+                }
+                else if (ReferenceEquals(_currentNote, snapshot.Note) && _activeEditor != null)
+                {
+                    _metaLabel.Text = "修改中 · " + _activeEditor.GetWordCount() + " 字";
+                }
+                RefreshNoteItem(snapshot.Note);
+                if (snapshot.Announce)
+                {
+                    ShowToast("笔记已保存", ToastKind.Success);
+                }
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    PopStatus();
+                }
+            }
         }
 
         /// <summary>
@@ -1808,16 +2246,23 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void RefreshNoteItem(Note note)
         {
+            string title = note.Title.Length == 0 ? "无标题" : note.Title;
+            DateTime time = (note.UpdateTime ?? note.CreateTime).ToLocalTime();
             foreach (ListViewItem item in _noteList.Items)
             {
-                if (((Note)item.Tag!).Id == note.Id)
+                if (item.Tag is Note listed && listed.Id == note.Id)
                 {
-                    int index = item.Index;
-                    bool selected = item.Selected;
-                    _noteList.Items.RemoveAt(index);
-                    ListViewItem rebuilt = BuildNoteItem(note);
-                    _noteList.Items.Insert(Math.Min(index, _noteList.Items.Count), rebuilt);
-                    rebuilt.Selected = selected;
+                    item.Tag = note;
+                    item.Text = title;
+                    if (item.SubItems.Count > 1)
+                    {
+                        item.SubItems[1].Text = time.ToString("MM-dd HH:mm");
+                    }
+                    if (item.SubItems.Count > 2)
+                    {
+                        item.SubItems[2].Text = note.WordCount.ToString();
+                    }
+                    _noteList.Invalidate(item.Bounds);
                     break;
                 }
             }
@@ -1877,8 +2322,10 @@ namespace Rampage.CryptedNotex.WinForm
         {
             _currentNote = null;
             _editing = false;
+            _activeEditor?.SetReadOnly(true);
             _titleBox.ReadOnly = true;
             _titleBox.Text = string.Empty;
+            _activeEditor?.MarkSaved();
             _editToggleButton.Text = "编辑";
             _editToggleButton.Enabled = false;
             _attachmentPanel.SetReadOnly(true);
@@ -1887,6 +2334,7 @@ namespace Rampage.CryptedNotex.WinForm
             foreach (KeyValuePair<ContentType, NoteEditorBase> pair in _editors)
             {
                 pair.Value.Visible = false;
+                pair.Value.SetReadOnly(true);
             }
             _activeEditor = null;
             _attachmentPanel.LoadAttachments(new List<NoteAttachment>());
@@ -1938,11 +2386,11 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 添加附件(文件选择→加密入库)
         /// </summary>
-        private void AddAttachment()
+        private async void AddAttachment()
         {
             if (_currentNote == null || !_editing)
             {
-                MessageBox.Show("请先进入编辑", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowToast("请先进入编辑", ToastKind.Info);
                 return;
             }
             Category? category = FindCategory(_currentNote.CategoryId);
@@ -1969,42 +2417,66 @@ namespace Rampage.CryptedNotex.WinForm
                 }
                 catch (InvalidOperationException)
                 {
-                    MessageBox.Show("分类已锁定,无法添加附件", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowToast("分类已锁定,无法添加附件", ToastKind.Error);
                     return;
                 }
 
+                int userId = _session.User!.Id;
+                int noteId = _currentNote.Id;
+                int saved = 0;
                 foreach (string file in dialog.FileNames)
                 {
+                    string fileName = Path.GetFileName(file);
+                    byte[] plainBytes;
                     try
                     {
-                        byte[] plainBytes = File.ReadAllBytes(file);
-                        if (plainBytes.Length > AttachmentPanel.SIZE_WARNING_BYTES
-                            && MessageBox.Show("文件「" + Path.GetFileName(file) + "」超过 50MB,仍要加密保存吗？",
-                                Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                        {
-                            continue;
-                        }
-                        R result = GetService<INoteAttachmentService>().AddAttachment(
-                            _session.User!.Id, _currentNote.Id, Path.GetFileName(file),
-                            GuessMimeType(file), plainBytes, contentKey);
-                        if (!result.IsSuccess)
-                        {
-                            MessageBox.Show(result.Message ?? "附件保存失败", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
+                        plainBytes = await RunMainAsync("正在读取「" + fileName + "」…", () => File.ReadAllBytes(file));
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("读取文件失败：" + ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ShowToast("读取文件失败：" + ex.Message, ToastKind.Error);
+                        continue;
+                    }
+
+                    if (plainBytes.Length > AttachmentPanel.SIZE_WARNING_BYTES
+                        && MessageBox.Show("文件「" + fileName + "」超过 50MB,仍要加密保存吗？",
+                            Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                    {
+                        continue;
+                    }
+
+                    string mimeType = GuessMimeType(file);
+                    try
+                    {
+                        R result = await RunMainAsync("正在加密「" + fileName + "」…", () => GetService<INoteAttachmentService>().AddAttachment(
+                            userId, noteId, fileName, mimeType, plainBytes, contentKey));
+                        if (!result.IsSuccess)
+                        {
+                            ShowToast(result.Message ?? "附件保存失败", ToastKind.Error);
+                            continue;
+                        }
+                        saved++;
+                    }
+                    catch (Exception ex)
+                    {
+                        ShowToast("附件保存失败：" + ex.Message, ToastKind.Error);
                     }
                 }
-                LoadAttachments(_currentNote.Id);
+                if (_currentNote != null && _currentNote.Id == noteId)
+                {
+                    LoadAttachments(noteId);
+                }
+                if (saved > 0)
+                {
+                    ShowToast(saved == 1 ? "已加密保存 1 个附件" : "已加密保存 " + saved + " 个附件", ToastKind.Success);
+                }
             }
         }
 
         /// <summary>
         /// 打开附件：图片内存预览,其他类型导出
         /// </summary>
-        private void OpenAttachment(NoteAttachment attachment)
+        private async void OpenAttachment(NoteAttachment attachment)
         {
             if (_currentNote == null)
             {
@@ -2023,14 +2495,23 @@ namespace Rampage.CryptedNotex.WinForm
             }
             catch (InvalidOperationException)
             {
-                MessageBox.Show("分类已锁定", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast("分类已锁定", ToastKind.Error);
                 return;
             }
 
-            byte[]? plainBytes = GetService<INoteAttachmentService>().DecryptAttachment(attachment.Id, contentKey);
+            byte[]? plainBytes;
+            try
+            {
+                plainBytes = await RunMainAsync("正在解密附件…", () => GetService<INoteAttachmentService>().DecryptAttachment(attachment.Id, contentKey));
+            }
+            catch (Exception ex)
+            {
+                ShowToast("附件解密失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (plainBytes == null)
             {
-                MessageBox.Show("附件解密失败(数据损坏或密钥不符)", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast("附件解密失败(数据损坏或密钥不符)", ToastKind.Error);
                 return;
             }
 
@@ -2049,17 +2530,24 @@ namespace Rampage.CryptedNotex.WinForm
                 FileName = attachment.FileName
             })
             {
-                if (dialog.ShowDialog(this) == DialogResult.OK)
+                if (dialog.ShowDialog(this) != DialogResult.OK)
                 {
-                    try
+                    return;
+                }
+
+                string path = dialog.FileName;
+                try
+                {
+                    await RunMainAsync("正在导出…", () =>
                     {
-                        File.WriteAllBytes(dialog.FileName, plainBytes);
-                        MessageBox.Show("已导出：" + dialog.FileName, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("导出失败：" + ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
+                        File.WriteAllBytes(path, plainBytes);
+                        return true;
+                    });
+                    ShowToast("已导出：" + path, ToastKind.Success);
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("导出失败：" + ex.Message, ToastKind.Error);
                 }
             }
         }
@@ -2067,18 +2555,32 @@ namespace Rampage.CryptedNotex.WinForm
         /// <summary>
         /// 删除附件
         /// </summary>
-        private void RemoveAttachment(NoteAttachment attachment)
+        private async void RemoveAttachment(NoteAttachment attachment)
         {
             if (!_editing)
             {
                 return;
             }
 
-            GetService<INoteAttachmentService>().RemoveAttachment(attachment.Id);
+            try
+            {
+                R result = await RunMainAsync("正在移除附件…", () => GetService<INoteAttachmentService>().RemoveAttachment(attachment.Id));
+                if (!result.IsSuccess)
+                {
+                    ShowToast(result.Message ?? "移除失败", ToastKind.Error);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowToast("移除失败：" + ex.Message, ToastKind.Error);
+                return;
+            }
             if (_currentNote != null)
             {
                 LoadAttachments(_currentNote.Id);
             }
+            ShowToast("已移除附件", ToastKind.Success);
         }
 
         /// <summary>
@@ -2151,5 +2653,104 @@ namespace Rampage.CryptedNotex.WinForm
         }
 
         #endregion
+
+        /// <summary>
+        /// 主窗体忙碌：底部状态条上的不定进度，不把三栏顶下去
+        /// </summary>
+        private async Task<T> RunMainAsync<T>(string message, Func<T> work)
+        {
+            PushStatus(message);
+            try
+            {
+                return await UiWork.RunAsync(work);
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    PopStatus();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 记下正在进行的操作
+        /// </summary>
+        private void PushStatus(string message)
+        {
+            _statusBusy++;
+            _statusLabel.Text = message;
+            _statusProgressHost.Visible = true;
+            UseWaitCursor = true;
+        }
+
+        /// <summary>
+        /// 结束一层操作。全部结束时回到列表摘要。
+        /// </summary>
+        private void PopStatus()
+        {
+            _statusBusy = Math.Max(0, _statusBusy - 1);
+            if (_statusBusy > 0)
+            {
+                return;
+            }
+            _statusProgressHost.Visible = false;
+            UseWaitCursor = false;
+            _statusLabel.Text = IdleStatus();
+        }
+
+        /// <summary>
+        /// 空闲时的状态条文案
+        /// </summary>
+        private string IdleStatus()
+        {
+            if (_searchKeyword.Length > 0)
+            {
+                return "搜索「" + _searchKeyword + "」· " + _notes.Count + " 条";
+            }
+            if (_trashView)
+            {
+                return "回收站 · " + _notes.Count + " 条";
+            }
+            if (_currentCategory != null)
+            {
+                return _currentCategory.Name + " · " + _notes.Count + " 条";
+            }
+            return "就绪";
+        }
+
+        /// <summary>
+        /// 改搜索框但不触发防抖搜索
+        /// </summary>
+        private void SetSearchText(string text)
+        {
+            _suppressSearch = true;
+            try
+            {
+                _searchBox.Text = text;
+            }
+            finally
+            {
+                _suppressSearch = false;
+            }
+        }
+
+        /// <summary>
+        /// 一次保存的明文快照。后台线程只使用这里的副本，避免保存过程中读到另一条笔记。
+        /// </summary>
+        private sealed class SaveSnapshot
+        {
+            public Note Note { get; set; } = null!;
+
+            public string Title { get; set; } = string.Empty;
+
+            public string Content { get; set; } = string.Empty;
+
+            public byte[] Key { get; set; } = Array.Empty<byte>();
+
+            public int WordCount { get; set; }
+
+            public bool Announce { get; set; }
+        }
     }
 }

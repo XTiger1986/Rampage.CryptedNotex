@@ -20,12 +20,14 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private readonly ILoginAttemptTracker _tracker = MemoryLoginAttemptTracker.Default;
         private List<UserBriefDto> _users = new List<UserBriefDto>();
 
+        private Panel _card = null!;
         private ListBox _userList = null!;
         private TextBox _passwordBox = null!;
         private Button _loginButton = null!;
         private Button _exitButton = null!;
         private Label _hintLabel = null!;
         private Timer _countdownTimer = null!;
+        private bool _loggingIn;
 
         /// <summary>
         /// 构造登录窗体
@@ -49,35 +51,46 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void BuildUi()
         {
-            Panel card = new Panel
+            _card = new Panel
             {
                 Size = new Size(440, 560),
                 Location = new Point(60, 40),
                 Tag = "theme:cardEmblem"
             };
-            Controls.Add(card);
+            Controls.Add(_card);
+            Panel card = _card;
 
             Label titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
-                Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(28, 118)
+                Location = new Point(28, 108)
             };
             card.Controls.Add(titleLabel);
+
+            Label subtitleLabel = new Label
+            {
+                Text = "本地加密笔记，只存在这台设备上",
+                Tag = "theme:muted",
+                AutoSize = true,
+                Location = new Point(30, 142)
+            };
+            card.Controls.Add(subtitleLabel);
 
             Label userLabel = new Label
             {
                 Text = "选择用户",
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(28, 162)
+                Location = new Point(28, 176)
             };
             card.Controls.Add(userLabel);
 
             _userList = new ListBox
             {
-                Location = new Point(28, 186),
-                Size = new Size(384, 160),
+                Location = new Point(28, 200),
+                Size = new Size(384, 148),
                 DrawMode = DrawMode.OwnerDrawFixed,
                 ItemHeight = 32,
                 Font = new Font("Microsoft YaHei UI", 10F),
@@ -91,14 +104,15 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             Label passwordLabel = new Label
             {
                 Text = "密码",
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(28, 358)
+                Location = new Point(28, 360)
             };
             card.Controls.Add(passwordLabel);
 
             _passwordBox = new TextBox
             {
-                Location = new Point(28, 380),
+                Location = new Point(28, 384),
                 Size = new Size(384, 28),
                 Font = new Font("Microsoft YaHei UI", 10.5F),
                 UseSystemPasswordChar = true,
@@ -111,17 +125,18 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 Text = "登录",
                 Tag = "theme:accent",
-                Location = new Point(28, 424),
-                Size = new Size(184, 36),
+                Location = new Point(28, 432),
+                Size = new Size(184, 38),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
-            _loginButton.Click += (sender, e) => AttemptLogin();
+            _loginButton.Click += async (sender, e) => await AttemptLoginAsync();
             card.Controls.Add(_loginButton);
+            AcceptButton = _loginButton;
 
             _exitButton = new Button
             {
                 Text = "退出",
-                Location = new Point(228, 424),
+                Location = new Point(228, 432),
                 Size = new Size(184, 36),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
@@ -131,6 +146,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Close();
             };
             card.Controls.Add(_exitButton);
+            CancelButton = _exitButton;
 
             _hintLabel = new Label
             {
@@ -138,7 +154,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(384, 0),
-                Location = new Point(28, 476)
+                Location = new Point(28, 484)
             };
             card.Controls.Add(_hintLabel);
 
@@ -149,7 +165,36 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _countdownTimer.Tick += (sender, e) => RefreshBlockState();
 
             _userList.SelectedIndexChanged += (sender, e) => RefreshBlockState();
-            _passwordBox.TextChanged += (sender, e) => _hintLabel.Text = "忘记密码 = 数据无法恢复(无后门)";
+            _passwordBox.TextChanged += (sender, e) =>
+            {
+                if (!_loggingIn)
+                {
+                    _hintLabel.Text = "忘记密码 = 数据无法恢复(无后门)";
+                }
+            };
+        }
+
+        /// <summary>
+        /// 卡片在壁纸上居中
+        /// </summary>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            CenterCard();
+        }
+
+        /// <summary>
+        /// 把登录卡片摆到客户区中央
+        /// </summary>
+        private void CenterCard()
+        {
+            if (_card == null)
+            {
+                return;
+            }
+            _card.Location = new Point(
+                Math.Max(16, (ClientSize.Width - _card.Width) / 2),
+                Math.Max(16, (ClientSize.Height - _card.Height) / 2));
         }
 
         /// <summary>
@@ -187,6 +232,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         {
             base.OnShown(e);
             ClientSize = new Size(560, 640);
+            CenterCard();
         }
 
         /// <summary>
@@ -229,7 +275,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             if (e.KeyCode == Keys.Enter)
             {
                 e.SuppressKeyPress = true;
-                AttemptLogin();
+                _ = AttemptLoginAsync();
             }
         }
 
@@ -238,6 +284,12 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void RefreshBlockState()
         {
+            if (_loggingIn)
+            {
+                _loginButton.Enabled = false;
+                return;
+            }
+
             UserBriefDto? selected = SelectedUser();
             if (selected == null)
             {
@@ -268,38 +320,86 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 尝试登录
+        /// 尝试登录。口令派生在后台进行，界面保持可重绘。
         /// </summary>
-        private void AttemptLogin()
+        private async Task AttemptLoginAsync()
         {
+            if (_loggingIn)
+            {
+                return;
+            }
+
             UserBriefDto? selected = SelectedUser();
             if (selected == null)
             {
+                ShowToast("请先选择用户", ToastKind.Info);
                 return;
             }
 
             if (_tracker.IsBlocked("notex", selected.Username, null, out TimeSpan retryAfter))
             {
-                _hintLabel.Text = "失败次数过多，请 " + Math.Ceiling(retryAfter.TotalSeconds) + " 秒后重试";
+                string blocked = "失败次数过多，请 " + Math.Ceiling(retryAfter.TotalSeconds) + " 秒后重试";
+                _hintLabel.Text = blocked;
+                ShowToast(blocked, ToastKind.Error);
                 return;
             }
 
             string password = _passwordBox.Text;
-            UserBriefDto? user = GetService<IUserService>().VerifyUser(selected.Username, password, out byte[]? contentKey);
-            if (user == null || contentKey == null)
+            string username = selected.Username;
+            _loggingIn = true;
+            SetLoginInputsEnabled(false);
+            try
             {
-                _tracker.RecordFailure("notex", selected.Username, null);
-                _hintLabel.Text = "密码错误(忘记密码 = 数据无法恢复)";
-                _passwordBox.SelectAll();
-                RefreshBlockState();
-                return;
-            }
+                (UserBriefDto? user, byte[]? contentKey) = await RunBusyAsync("正在验证密码…", () =>
+                {
+                    UserBriefDto? verified = GetService<IUserService>().VerifyUser(username, password, out byte[]? key);
+                    return (verified, key);
+                });
+                if (IsDisposed)
+                {
+                    return;
+                }
+                if (user == null || contentKey == null)
+                {
+                    _tracker.RecordFailure("notex", username, null);
+                    _hintLabel.Text = "密码错误(忘记密码 = 数据无法恢复)";
+                    ShowToast("密码错误。忘记密码就无法恢复数据。", ToastKind.Error);
+                    _passwordBox.SelectAll();
+                    _passwordBox.Focus();
+                    RefreshBlockState();
+                    return;
+                }
 
-            _tracker.Reset("notex", selected.Username);
-            _session.Init(user, contentKey);
-            ApplyUserTheme(user.Id);
-            DialogResult = DialogResult.OK;
-            Close();
+                _tracker.Reset("notex", username);
+                _session.Init(user, contentKey);
+                ApplyUserTheme(user.Id);
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+            catch (Exception ex)
+            {
+                ShowToast("登录失败：" + ex.Message, ToastKind.Error);
+            }
+            finally
+            {
+                _loggingIn = false;
+                if (!IsDisposed)
+                {
+                    SetLoginInputsEnabled(true);
+                    RefreshBlockState();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 验证期间锁住输入，避免重复提交
+        /// </summary>
+        private void SetLoginInputsEnabled(bool enabled)
+        {
+            _userList.Enabled = enabled;
+            _passwordBox.Enabled = enabled;
+            _exitButton.Enabled = enabled;
+            _loginButton.Text = enabled ? "登录" : "正在验证…";
         }
 
         /// <summary>

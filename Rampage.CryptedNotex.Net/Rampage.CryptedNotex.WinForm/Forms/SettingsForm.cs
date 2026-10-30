@@ -39,7 +39,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(480, 560);
+            ClientSize = new Size(520, 620);
             BuildUi();
         }
 
@@ -48,45 +48,45 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void BuildUi()
         {
-            int y = 14;
+            int y = 20;
 
             Label themeTitle = new Label
             {
                 Text = "界面主题",
-                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(16, y)
+                Location = new Point(20, y)
             };
             Controls.Add(themeTitle);
-            y += 26;
+            y += 28;
 
             _themeGallery = new FlowLayoutPanel
             {
-                Location = new Point(16, y),
-                Size = new Size(448, 180),
+                Location = new Point(20, y),
+                Size = new Size(480, 188),
                 AutoScroll = true
             };
             Controls.Add(_themeGallery);
-            y += 190;
+            y += 204;
 
             y = AddSection("自动锁定(分钟,0=不锁定)", y);
             _lockMinutesBox = new NumericUpDown
             {
-                Location = new Point(16, y),
-                Size = new Size(120, 26),
+                Location = new Point(20, y),
+                Size = new Size(140, 28),
                 Minimum = 0,
                 Maximum = 240,
                 Value = Math.Max(0, Math.Min(240, _setting.AutoLockMinutes))
             };
             Controls.Add(_lockMinutesBox);
-            y += 40;
+            y += 48;
 
             y = AddSection("编辑器字体(纯文本/Markdown)", y);
             _fontFamilyBox = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(16, y),
-                Size = new Size(200, 26)
+                Location = new Point(20, y),
+                Size = new Size(220, 28)
             };
             foreach (string family in new string[] { "Consolas", "Cascadia Mono", "Cascadia Code", "Courier New", "Microsoft YaHei UI", "SimSun" })
             {
@@ -101,8 +101,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _fontSizeBox = new NumericUpDown
             {
-                Location = new Point(230, y),
-                Size = new Size(70, 26),
+                Location = new Point(256, y),
+                Size = new Size(80, 28),
                 Minimum = 8,
                 Maximum = 28,
                 DecimalPlaces = 1,
@@ -110,30 +110,33 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Value = (decimal)Math.Max(8, Math.Min(28, _setting.EditorFontSize))
             };
             Controls.Add(_fontSizeBox);
-            y += 40;
+            y += 48;
 
             y = AddSection("显示名", y);
             _displayNameBox = new TextBox
             {
                 Text = _session.User?.DisplayName ?? string.Empty,
-                Location = new Point(16, y),
-                Size = new Size(284, 26),
+                Location = new Point(20, y),
+                Size = new Size(316, 28),
                 Font = new Font("Microsoft YaHei UI", 10F)
             };
             Controls.Add(_displayNameBox);
-            y += 40;
+            y += 48;
 
             Button changePasswordButton = new Button
             {
                 Text = "修改密码(全量重加密)…",
-                Location = new Point(16, y),
-                Size = new Size(220, 32)
+                Location = new Point(20, y),
+                Size = new Size(240, 36)
             };
             changePasswordButton.Click += (sender, e) =>
             {
                 using (ChangePasswordForm form = new ChangePasswordForm(App, _session))
                 {
-                    form.ShowDialog(this);
+                    if (form.ShowDialog(this) == DialogResult.OK)
+                    {
+                        ShowToast("密码已更新，全部笔记已用新密码重新加密。", ToastKind.Success);
+                    }
                 }
             };
             Controls.Add(changePasswordButton);
@@ -142,8 +145,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 Text = "保存",
                 Tag = "theme:accent",
-                Location = new Point(16, y + 44),
-                Size = new Size(220, 34)
+                Location = new Point(20, y + 52),
+                Size = new Size(240, 36)
             };
             saveButton.Click += (sender, e) => Save();
             Controls.Add(saveButton);
@@ -151,8 +154,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             Button closeButton = new Button
             {
                 Text = "关闭",
-                Location = new Point(252, y + 44),
-                Size = new Size(212, 34)
+                Location = new Point(276, y + 52),
+                Size = new Size(224, 36)
             };
             closeButton.Click += (sender, e) => Close();
             Controls.Add(closeButton);
@@ -162,10 +165,12 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Text = string.Empty,
                 Tag = "theme:muted",
                 AutoSize = true,
-                Location = new Point(16, y + 92)
+                Location = new Point(20, y + 100)
             };
             Controls.Add(_statusLabel);
-            ClientSize = new Size(480, y + 124);
+            ClientSize = new Size(520, y + 140);
+            AcceptButton = saveButton;
+            CancelButton = closeButton;
         }
 
         /// <summary>
@@ -178,10 +183,10 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Text = title,
                 Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(16, y)
+                Location = new Point(20, y)
             };
             Controls.Add(label);
-            return y + 26;
+            return y + 30;
         }
 
         /// <summary>
@@ -231,14 +236,24 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             R saved = GetService<IUserSettingService>().SaveUserSetting(_setting);
             string status = saved.IsSuccess ? "已保存" : ("保存失败：" + saved.Message);
+            ToastKind kind = saved.IsSuccess ? ToastKind.Success : ToastKind.Error;
 
             string displayName = _displayNameBox.Text.Trim();
             if (displayName.Length > 0 && displayName != _session.User?.DisplayName)
             {
                 R rename = GetService<IUserService>().UpdateDisplayName(_session.User!.Id, displayName);
-                status = rename.IsSuccess ? status + "，显示名已更新" : status + "，显示名更新失败";
+                if (rename.IsSuccess)
+                {
+                    status = status + "，显示名已更新";
+                }
+                else
+                {
+                    status = status + "，显示名更新失败";
+                    kind = ToastKind.Error;
+                }
             }
             _statusLabel.Text = status;
+            ShowToast(status, kind);
         }
 
         /// <summary>

@@ -38,12 +38,12 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             Values = new string[fieldLabels.Length];
             Text = title;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
 
-            int y = 16;
+            int y = 20;
             if (!string.IsNullOrEmpty(message))
             {
                 Label messageLabel = new Label
@@ -51,11 +51,11 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     Text = message,
                     Tag = "theme:muted",
                     AutoSize = true,
-                    MaximumSize = new Size(340, 0),
-                    Location = new Point(16, y)
+                    MaximumSize = new Size(380, 0),
+                    Location = new Point(20, y)
                 };
                 Controls.Add(messageLabel);
-                y = messageLabel.Bottom + 10;
+                y = messageLabel.Bottom + 12;
             }
 
             foreach (string label in fieldLabels)
@@ -63,17 +63,18 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Label fieldLabel = new Label
                 {
                     Text = label,
+                    Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                     AutoSize = true,
-                    Location = new Point(16, y)
+                    Location = new Point(20, y)
                 };
                 Controls.Add(fieldLabel);
-                y += 20;
+                y += 22;
 
                 TextBox box = new TextBox
                 {
-                    Location = new Point(16, y),
-                    Size = new Size(330, 26),
-                    Font = new Font("Microsoft YaHei UI", 10F),
+                    Location = new Point(20, y),
+                    Size = new Size(372, 28),
+                    Font = new Font("Microsoft YaHei UI", 10.5F),
                     UseSystemPasswordChar = true
                 };
                 int index = _boxes.Count;
@@ -94,24 +95,25 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 };
                 _boxes.Add(box);
                 Controls.Add(box);
-                y += 34;
+                y += 40;
             }
 
             Button okButton = new Button
             {
                 Text = "确定",
                 Tag = "theme:accent",
-                Location = new Point(16, y + 4),
-                Size = new Size(158, 32)
+                Location = new Point(20, y + 6),
+                Size = new Size(180, 36)
             };
             okButton.Click += (sender, e) => Confirm();
             Controls.Add(okButton);
+            AcceptButton = okButton;
 
             Button cancelButton = new Button
             {
                 Text = "取消",
-                Location = new Point(188, y + 4),
-                Size = new Size(158, 32)
+                Location = new Point(212, y + 6),
+                Size = new Size(180, 36)
             };
             cancelButton.Click += (sender, e) =>
             {
@@ -119,8 +121,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Close();
             };
             Controls.Add(cancelButton);
+            CancelButton = cancelButton;
 
-            ClientSize = new Size(370, y + 48);
+            ClientSize = new Size(412, y + 58);
         }
 
         /// <summary>
