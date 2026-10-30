@@ -30,26 +30,27 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         public CategoryEditForm(IRampageApplication app, string title, string initialName) : base(app)
         {
             Text = title;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(340, 128);
+            ClientSize = new Size(380, 156);
 
             Label nameLabel = new Label
             {
                 Text = "分类名",
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(14, 14)
+                Location = new Point(20, 18)
             };
             Controls.Add(nameLabel);
 
             _nameBox = new TextBox
             {
                 Text = initialName,
-                Location = new Point(14, 36),
-                Size = new Size(312, 26),
-                Font = new Font("Microsoft YaHei UI", 10F)
+                Location = new Point(20, 42),
+                Size = new Size(340, 28),
+                Font = new Font("Microsoft YaHei UI", 10.5F)
             };
             _nameBox.KeyDown += (sender, e) =>
             {
@@ -65,17 +66,18 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 Text = "确定",
                 Tag = "theme:accent",
-                Location = new Point(14, 76),
-                Size = new Size(148, 32)
+                Location = new Point(20, 88),
+                Size = new Size(164, 36)
             };
             okButton.Click += (sender, e) => Confirm();
             Controls.Add(okButton);
+            AcceptButton = okButton;
 
             Button cancelButton = new Button
             {
                 Text = "取消",
-                Location = new Point(178, 76),
-                Size = new Size(148, 32)
+                Location = new Point(196, 88),
+                Size = new Size(164, 36)
             };
             cancelButton.Click += (sender, e) =>
             {
@@ -83,6 +85,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Close();
             };
             Controls.Add(cancelButton);
+            CancelButton = cancelButton;
         }
 
         /// <summary>
@@ -103,7 +106,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             string name = _nameBox.Text.Trim();
             if (name.Length == 0)
             {
-                MessageBox.Show("分类名不能为空", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast("分类名不能为空", ToastKind.Error);
+                _nameBox.Focus();
                 return;
             }
             CategoryName = name;

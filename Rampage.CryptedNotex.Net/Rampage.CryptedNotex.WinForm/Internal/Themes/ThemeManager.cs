@@ -20,7 +20,8 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
     /// accent 强调色 / accentText 强调色上的文本 / selectionBack 选中底 /
     /// pinnedMark 置顶标记 / trashTint 回收站色 / warning 警示 / danger 危险 / link 链接 /
     /// editorBack 编辑器底 / editorText 编辑器文本 / previewBack 预览底。
-    /// 控件 Tag 约定："theme:accent" 强调按钮、"theme:muted" 次要文本、"theme:danger" 危险按钮。
+    /// 控件 Tag 约定："theme:accent" 强调按钮、"theme:muted" 次要文本、"theme:danger" 危险按钮、
+    /// "theme:panelAlt" 列表底、"theme:editor" 编辑器底。
     /// </remarks>
     public static class ThemeManager
     {
@@ -242,6 +243,11 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             else if (control is PictureBox || control is ProgressBar)
             {
                 // 图片与进度条保持控件默认渲染
+            }
+            else if (tag == "theme:panelAlt" || tag == "theme:editor")
+            {
+                control.BackColor = tag == "theme:editor" ? GetColor("editorBack") : panelAltBack;
+                control.ForeColor = text;
             }
             else
             {

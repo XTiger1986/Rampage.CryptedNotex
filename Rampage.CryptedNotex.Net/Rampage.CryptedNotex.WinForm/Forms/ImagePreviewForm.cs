@@ -23,17 +23,36 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// <param name="plainBytes">解密后的图片字节</param>
         public ImagePreviewForm(IRampageApplication app, string fileName, byte[] plainBytes) : base(app)
         {
-            Text = "图片预览 - " + fileName;
-            ClientSize = new Size(900, 640);
+            Text = fileName;
+            ClientSize = new Size(920, 680);
             StartPosition = FormStartPosition.CenterParent;
+            MinimumSize = new Size(480, 360);
+
+            Panel captionBar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 44,
+                Padding = new Padding(16, 8, 16, 8)
+            };
+            Label caption = new Label
+            {
+                Text = fileName + "    ·    仅在内存中预览，不写临时文件",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoEllipsis = true,
+                Tag = "theme:muted"
+            };
+            captionBar.Controls.Add(caption);
+            Controls.Add(captionBar);
 
             _pictureBox = new PictureBox
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(60, 60, 60),
-                SizeMode = PictureBoxSizeMode.Zoom
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Tag = "theme:editor"
             };
             Controls.Add(_pictureBox);
+            captionBar.BringToFront();
 
             try
             {
@@ -44,7 +63,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             }
             catch (ArgumentException)
             {
-                MessageBox.Show("无法识别的图片格式", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowToast("无法识别的图片格式", ToastKind.Error);
             }
         }
 

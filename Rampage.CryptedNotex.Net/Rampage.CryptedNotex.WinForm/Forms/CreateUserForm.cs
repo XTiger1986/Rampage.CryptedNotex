@@ -16,12 +16,15 @@ namespace Rampage.CryptedNotex.WinForm.Forms
     {
         private readonly CryptoSession _session;
 
+        private Panel _card = null!;
         private TextBox _usernameBox = null!;
         private TextBox _displayNameBox = null!;
         private TextBox _passwordBox = null!;
         private TextBox _confirmBox = null!;
         private Button _createButton = null!;
         private Label _hintLabel = null!;
+
+        private bool _creating;
 
         /// <summary>
         /// 构造创建用户窗体
@@ -33,7 +36,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _session = session;
             Text = NotexBrand.DisplayName + " · 创建用户";
             Tag = "theme:wallpaper";
-            ClientSize = new Size(560, 800);
+            ClientSize = new Size(560, 720);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -45,20 +48,21 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void BuildUi()
         {
-            Panel card = new Panel
+            _card = new Panel
             {
-                Size = new Size(460, 720),
+                Size = new Size(460, 640),
                 Location = new Point(50, 40),
                 Tag = "theme:cardEmblem"
             };
-            Controls.Add(card);
+            Controls.Add(_card);
+            Panel card = _card;
 
             Label titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
-                Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(28, 116)
+                Location = new Point(28, 108)
             };
             card.Controls.Add(titleLabel);
 
@@ -68,25 +72,26 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(404, 0),
-                Location = new Point(28, 158)
+                Location = new Point(28, 148)
             };
             card.Controls.Add(welcomeLabel);
 
-            AddField(card, "登录名(英文或数字,至少2个字符)", ref _usernameBox, 250, false);
-            AddField(card, "显示名(可留空)", ref _displayNameBox, 322, false);
-            AddField(card, "密码(至少6位)", ref _passwordBox, 394, true);
-            AddField(card, "确认密码", ref _confirmBox, 466, true);
+            AddField(card, "登录名(英文或数字,至少2个字符)", ref _usernameBox, 230, false);
+            AddField(card, "显示名(可留空)", ref _displayNameBox, 302, false);
+            AddField(card, "密码(至少6位)", ref _passwordBox, 374, true);
+            AddField(card, "确认密码", ref _confirmBox, 446, true);
 
             _createButton = new Button
             {
                 Text = "创建并进入",
                 Tag = "theme:accent",
-                Location = new Point(28, 552),
-                Size = new Size(404, 36),
+                Location = new Point(28, 530),
+                Size = new Size(404, 38),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
-            _createButton.Click += (sender, e) => AttemptCreate();
+            _createButton.Click += async (sender, e) => await AttemptCreateAsync();
             card.Controls.Add(_createButton);
+            AcceptButton = _createButton;
 
             _hintLabel = new Label
             {
@@ -94,7 +99,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(404, 0),
-                Location = new Point(28, 600)
+                Location = new Point(28, 580)
             };
             card.Controls.Add(_hintLabel);
 
@@ -103,9 +108,32 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 if (e.KeyCode == Keys.Enter)
                 {
                     e.SuppressKeyPress = true;
-                    AttemptCreate();
+                    _ = AttemptCreateAsync();
                 }
             };
+        }
+
+        /// <summary>
+        /// 卡片在壁纸上居中
+        /// </summary>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            CenterCard();
+        }
+
+        /// <summary>
+        /// 把创建卡片摆到客户区中央
+        /// </summary>
+        private void CenterCard()
+        {
+            if (_card == null)
+            {
+                return;
+            }
+            _card.Location = new Point(
+                Math.Max(16, (ClientSize.Width - _card.Width) / 2),
+                Math.Max(16, (ClientSize.Height - _card.Height) / 2));
         }
 
         /// <summary>
@@ -114,7 +142,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            ClientSize = new Size(560, 800);
+            ClientSize = new Size(560, 720);
+            CenterCard();
         }
 
         /// <summary>
@@ -132,7 +161,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             box = new TextBox
             {
-                Location = new Point(28, y + 22),
+                Location = new Point(28, y + 24),
                 Size = new Size(404, 26),
                 Font = new Font("Microsoft YaHei UI", 10F),
                 UseSystemPasswordChar = password,
@@ -142,10 +171,15 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 尝试创建用户
+        /// 尝试创建用户。密钥派生在后台进行。
         /// </summary>
-        private void AttemptCreate()
+        private async Task AttemptCreateAsync()
         {
+            if (_creating)
+            {
+                return;
+            }
+
             string username = _usernameBox.Text;
             string displayName = _displayNameBox.Text;
             string password = _passwordBox.Text;
@@ -153,16 +187,29 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             if (password != _confirmBox.Text)
             {
                 _hintLabel.Text = "两次输入的密码不一致";
+                ShowToast("两次输入的密码不一致", ToastKind.Error);
                 return;
             }
 
+            _creating = true;
             _createButton.Enabled = false;
+            _createButton.Text = "正在创建…";
             try
             {
-                R<UserBriefDto> result = GetService<IUserService>().CreateUser(username, displayName, password, out byte[]? contentKey);
+                (R<UserBriefDto> result, byte[]? contentKey) = await RunBusyAsync("正在创建账户并派生密钥…", () =>
+                {
+                    R<UserBriefDto> created = GetService<IUserService>().CreateUser(username, displayName, password, out byte[]? key);
+                    return (created, key);
+                });
+                if (IsDisposed)
+                {
+                    return;
+                }
                 if (!result.IsSuccess || result.Data == null || contentKey == null)
                 {
-                    _hintLabel.Text = result.Message ?? "创建失败";
+                    string message = result.Message ?? "创建失败";
+                    _hintLabel.Text = message;
+                    ShowToast(message, ToastKind.Error);
                     return;
                 }
 
@@ -179,9 +226,19 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 DialogResult = DialogResult.OK;
                 Close();
             }
+            catch (Exception ex)
+            {
+                _hintLabel.Text = "创建失败：" + ex.Message;
+                ShowToast("创建失败：" + ex.Message, ToastKind.Error);
+            }
             finally
             {
-                _createButton.Enabled = true;
+                _creating = false;
+                if (!IsDisposed)
+                {
+                    _createButton.Enabled = true;
+                    _createButton.Text = "创建并进入";
+                }
             }
         }
     }

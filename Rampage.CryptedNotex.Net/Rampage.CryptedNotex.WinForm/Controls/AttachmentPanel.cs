@@ -41,7 +41,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// </summary>
         public AttachmentPanel()
         {
-            Height = 44;
+            Height = 52;
             Dock = DockStyle.Bottom;
 
             TableLayoutPanel layout = new TableLayoutPanel
@@ -111,10 +111,18 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             Panel chip = new Panel
             {
                 AutoSize = true,
-                Margin = new Padding(0, 4, 8, 4),
-                Padding = new Padding(8, 3, 4, 3),
+                Margin = new Padding(0, 6, 8, 6),
+                Padding = new Padding(10, 4, 6, 4),
+                MinimumSize = new Size(0, 30),
                 Cursor = Cursors.Hand,
                 Tag = attachment
+            };
+            chip.Paint += (sender, e) =>
+            {
+                using (Pen pen = new Pen(ThemeManager.GetColor("border")))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, chip.Width - 1, chip.Height - 1);
+                }
             };
 
             string sizeText = FormatSize(attachment.FileSize);
