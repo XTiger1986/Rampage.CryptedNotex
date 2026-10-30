@@ -9,7 +9,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal
     /// <summary>
     /// 提示种类
     /// </summary>
-    internal enum ToastKind
+    public enum ToastKind
     {
         /// <summary>
         /// 一般说明
@@ -206,7 +206,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal
         {
             private readonly ToastKind _kind;
             private readonly string _message;
-            private readonly Timer _timer;
+            private readonly System.Windows.Forms.Timer _timer;
             private readonly Label _caption;
             private readonly Label _body;
 
@@ -254,7 +254,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal
                 _caption.Click += (sender, e) => Dismiss();
                 _body.Click += (sender, e) => Dismiss();
 
-                _timer = new Timer
+                _timer = new System.Windows.Forms.Timer
                 {
                     Interval = kind == ToastKind.Error ? 5600 : kind == ToastKind.Success ? 2600 : 3400
                 };
