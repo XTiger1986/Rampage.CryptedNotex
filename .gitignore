@@ -18,3 +18,4 @@ notex-screenshot-*.png
 *.user
 
 installer/output/
+Rampage.CryptedNotex.Net/Rampage.CryptedNotex.WinForm/Rampage.CryptedNotex.WinForm.csproj.user
