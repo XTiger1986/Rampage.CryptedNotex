@@ -96,7 +96,7 @@ namespace Rampage.CryptedNotex.BLL
             {
                 Username = name,
                 DisplayName = shownName,
-                PasswordHash = SecurityTool.PBKDF2Hash(password),
+                PasswordHash = SecurityTool.PBKDF2Hash(password, CryptoTool.LOGIN_HASH_ITERATIONS),
                 KdfAlgorithm = "PBKDF2-SHA256",
                 KdfIterations = CryptoTool.KDF_ITERATIONS_DEFAULT,
                 KdfSalt = CryptoTool.GenerateSaltBase64(),
@@ -150,9 +150,23 @@ namespace Rampage.CryptedNotex.BLL
             }
 
             user.LastLoginTime = UtcNow;
+            // 登录哈希透明升级：老哈希(10 万迭代)在成功登录时升到与内容 KDF 一致的强度，换新盐
+            if (StoredHashIterations(user.PasswordHash) < CryptoTool.LOGIN_HASH_ITERATIONS)
+            {
+                user.PasswordHash = SecurityTool.PBKDF2Hash(password, CryptoTool.LOGIN_HASH_ITERATIONS);
+            }
             UserDao.UpdateById(user);
             contentKey = CryptoTool.DeriveContentKey(password, user.KdfSalt, user.KdfIterations);
             return ToBriefDto(user);
+        }
+
+        /// <summary>
+        /// 读取登录哈希串内嵌的迭代数(格式 PBKDF2-SHA256$迭代$盐$哈希)；解析失败按 0 处理触发升级
+        /// </summary>
+        private static int StoredHashIterations(string? stored)
+        {
+            string[] parts = (stored ?? string.Empty).Split('$');
+            return parts.Length == 4 && int.TryParse(parts[1], out int iterations) ? iterations : 0;
         }
 
         /// <inheritdoc />
@@ -186,7 +200,7 @@ namespace Rampage.CryptedNotex.BLL
                 BeginTransaction();
                 try
                 {
-                    user.PasswordHash = SecurityTool.PBKDF2Hash(newPassword);
+                    user.PasswordHash = SecurityTool.PBKDF2Hash(newPassword, CryptoTool.LOGIN_HASH_ITERATIONS);
                     user.KdfAlgorithm = "PBKDF2-SHA256";
                     user.KdfIterations = CryptoTool.KDF_ITERATIONS_DEFAULT;
                     user.KdfSalt = newSalt;

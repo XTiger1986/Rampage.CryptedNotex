@@ -25,6 +25,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private Label _subtitleLabel = null!;
         private Label _userLabel = null!;
         private ListBox _userList = null!;
+        private Label _addUserLink = null!;
         private Label _passwordLabel = null!;
         private TextBox _passwordBox = null!;
         private Button _loginButton = null!;
@@ -33,6 +34,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private Timer _countdownTimer = null!;
         private bool _loggingIn;
         private Size _clientSize;
+        private int _userHoverIndex = -1;
 
         /// <summary>
         /// 构造登录窗体
@@ -99,7 +101,34 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             };
             _userList.DrawItem += UserListDrawItem;
             _userList.SelectedIndexChanged += (sender, e) => _passwordBox.Focus();
+            _userList.MouseMove += (sender, e) =>
+            {
+                int index = _userList.IndexFromPoint(e.Location);
+                if (index != _userHoverIndex)
+                {
+                    _userHoverIndex = index;
+                    _userList.Invalidate();
+                }
+            };
+            _userList.MouseLeave += (sender, e) =>
+            {
+                if (_userHoverIndex != -1)
+                {
+                    _userHoverIndex = -1;
+                    _userList.Invalidate();
+                }
+            };
             card.Controls.Add(_userList);
+
+            _addUserLink = new Label
+            {
+                Text = "添加用户",
+                Tag = "theme:link",
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            _addUserLink.Click += (sender, e) => OpenCreateUserForm();
+            card.Controls.Add(_addUserLink);
 
             _passwordLabel = new Label
             {
@@ -191,7 +220,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _userLabel.Location = new Point(x, y);
             y += _userLabel.Height + 7;
             _userList.Location = new Point(x, y);
-            y += _userList.Height + 12;
+            y += _userList.Height + 6;
+            _addUserLink.Location = new Point(x + 4, y);
+            y += _addUserLink.Height + 14;
             _passwordLabel.Location = new Point(x, y);
             y += _passwordLabel.Height + 7;
             _passwordBox.Location = new Point(x, y);
@@ -241,11 +272,19 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             }
 
             bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            bool hovered = !selected && e.Index == _userHoverIndex;
             Color back = selected ? ThemeManager.GetColor("selectionBack") : ThemeManager.GetColor("inputBack");
             Color fore = ThemeManager.GetColor("text");
             using (SolidBrush brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            if (hovered)
+            {
+                using (SolidBrush hoverBrush = new SolidBrush(ChromePainter.RowHoverColor()))
+                {
+                    e.Graphics.FillRectangle(hoverBrush, e.Bounds);
+                }
             }
             string text = _userList.Items[e.Index]?.ToString() ?? string.Empty;
             Rectangle textRect = new Rectangle(e.Bounds.X + 8, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
@@ -274,6 +313,14 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            ReloadUsers();
+        }
+
+        /// <summary>
+        /// 重载用户列表(登录窗打开与添加用户返回后调用)
+        /// </summary>
+        private void ReloadUsers()
+        {
             _users = GetService<IUserService>().GetUserBriefList();
             _userList.BeginUpdate();
             _userList.Items.Clear();
@@ -287,6 +334,25 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 _userList.SelectedIndex = 0;
             }
             RefreshBlockState();
+        }
+
+        /// <summary>
+        /// 从登录窗添加新用户:复用创建向导,成功即以新用户身份直接进入主界面
+        /// </summary>
+        private void OpenCreateUserForm()
+        {
+            using (CreateUserForm form = new CreateUserForm(App, _session, false))
+            {
+                if (form.ShowDialog(this) == DialogResult.OK)
+                {
+                    DialogResult = DialogResult.OK;
+                    Close();
+                }
+                else
+                {
+                    ReloadUsers();
+                }
+            }
         }
 
         /// <summary>

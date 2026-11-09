@@ -41,51 +41,72 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(520, 620);
             BuildUi();
+            // 点卡片即时换主题时,背后的主窗体实时变色,本窗体也要跟着刷,不能等重开
+            ThemeManager.CurrentChanged += OnThemeChanged;
+            Disposed += (sender, e) => ThemeManager.CurrentChanged -= OnThemeChanged;
         }
 
         /// <summary>
-        /// 构建界面
+        /// 主题切换后重刷本窗体(推迟到下一拍,避开切换事件的调用栈)
+        /// </summary>
+        private void OnThemeChanged(Theme theme)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+            if (IsHandleCreated)
+            {
+                try
+                {
+                    BeginInvoke(new Action(() => ThemeManager.Apply(this)));
+                }
+                catch (InvalidOperationException)
+                {
+                    // 句柄正在销毁
+                }
+            }
+            else
+            {
+                ThemeManager.Apply(this);
+            }
+        }
+
+        /// <summary>
+        /// 构建界面：界面主题/编辑器/账户与安全三段,行高按实测值流动(兼容高 DPI 字体放大)
         /// </summary>
         private void BuildUi()
         {
+            int x = 20;
+            int width = 480;
             int y = 20;
 
-            Label themeTitle = new Label
-            {
-                Text = "界面主题",
-                Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, y)
-            };
-            Controls.Add(themeTitle);
-            y += 28;
-
+            // ── 界面主题 ──
+            y = AddSectionHeader("界面主题", y, width);
             _themeGallery = new FlowLayoutPanel
             {
-                Location = new Point(20, y),
-                Size = new Size(480, 188),
+                Location = new Point(x, y),
+                Size = new Size(width, 300),
                 AutoScroll = true
             };
             Controls.Add(_themeGallery);
-            y += 204;
+            y += 312;
 
-            y = AddSection("自动锁定(分钟,0=不锁定)", y);
-            _lockMinutesBox = new NumericUpDown
+            // ── 编辑器 ──
+            y = AddSectionHeader("编辑器", y, width);
+            Label fontLabel = new Label
             {
-                Location = new Point(20, y),
-                Size = new Size(140, 28),
-                Minimum = 0,
-                Maximum = 240,
-                Value = Math.Max(0, Math.Min(240, _setting.AutoLockMinutes))
+                Text = "纯文本/Markdown 字体",
+                AutoSize = true,
+                Location = new Point(x, y)
             };
-            Controls.Add(_lockMinutesBox);
-            y += 48;
+            Controls.Add(fontLabel);
+            y += fontLabel.Height + 6;
 
-            y = AddSection("编辑器字体(纯文本/Markdown)", y);
             _fontFamilyBox = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(20, y),
+                Location = new Point(x, y),
                 Size = new Size(220, 28)
             };
             foreach (string family in new string[] { "Consolas", "Cascadia Mono", "Cascadia Code", "Courier New", "Microsoft YaHei UI", "SimSun" })
@@ -101,8 +122,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _fontSizeBox = new NumericUpDown
             {
-                Location = new Point(256, y),
-                Size = new Size(80, 28),
+                Location = new Point(x + 236, y),
+                Size = new Size(72, 28),
                 Minimum = 8,
                 Maximum = 28,
                 DecimalPlaces = 1,
@@ -110,23 +131,51 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Value = (decimal)Math.Max(8, Math.Min(28, _setting.EditorFontSize))
             };
             Controls.Add(_fontSizeBox);
-            y += 48;
+            y += RowHeight(_fontSizeBox) + 16;
 
-            y = AddSection("显示名", y);
+            // ── 账户与安全 ──
+            y = AddSectionHeader("账户与安全", y, width);
+            Label lockLabel = new Label
+            {
+                Text = "自动锁定(分钟,0=不锁定)",
+                AutoSize = true,
+                Location = new Point(x, y)
+            };
+            Controls.Add(lockLabel);
+            y += lockLabel.Height + 6;
+            _lockMinutesBox = new NumericUpDown
+            {
+                Location = new Point(x, y),
+                Size = new Size(96, 28),
+                Minimum = 0,
+                Maximum = 240,
+                Value = Math.Max(0, Math.Min(240, _setting.AutoLockMinutes))
+            };
+            Controls.Add(_lockMinutesBox);
+            y += RowHeight(_lockMinutesBox) + 16;
+
+            Label displayLabel = new Label
+            {
+                Text = "显示名",
+                AutoSize = true,
+                Location = new Point(x, y)
+            };
+            Controls.Add(displayLabel);
+            y += displayLabel.Height + 6;
             _displayNameBox = new TextBox
             {
                 Text = _session.User?.DisplayName ?? string.Empty,
-                Location = new Point(20, y),
+                Location = new Point(x, y),
                 Size = new Size(316, 28),
                 Font = new Font("Microsoft YaHei UI", 10F)
             };
             Controls.Add(_displayNameBox);
-            y += 48;
+            y += RowHeight(_displayNameBox) + 16;
 
             Button changePasswordButton = new Button
             {
                 Text = "修改密码(全量重加密)…",
-                Location = new Point(20, y),
+                Location = new Point(x, y),
                 Size = new Size(240, 36)
             };
             changePasswordButton.Click += (sender, e) =>
@@ -140,12 +189,13 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 }
             };
             Controls.Add(changePasswordButton);
+            y += 48;
 
             Button saveButton = new Button
             {
                 Text = "保存",
                 Tag = "theme:accent",
-                Location = new Point(20, y + 52),
+                Location = new Point(x, y),
                 Size = new Size(240, 36)
             };
             saveButton.Click += (sender, e) => Save();
@@ -154,39 +204,62 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             Button closeButton = new Button
             {
                 Text = "关闭",
-                Location = new Point(276, y + 52),
+                Location = new Point(276, y),
                 Size = new Size(224, 36)
             };
             closeButton.Click += (sender, e) => Close();
             Controls.Add(closeButton);
+            y += 48;
 
             _statusLabel = new Label
             {
                 Text = string.Empty,
                 Tag = "theme:muted",
                 AutoSize = true,
-                Location = new Point(20, y + 100)
+                Location = new Point(x, y)
             };
             Controls.Add(_statusLabel);
-            ClientSize = new Size(520, y + 140);
+            ClientSize = new Size(520, y + 40);
             AcceptButton = saveButton;
             CancelButton = closeButton;
         }
 
         /// <summary>
-        /// 添加节标题,返回下一行 y
+        /// 节标题 + 主题色细分隔线,返回内容起始 y
         /// </summary>
-        private int AddSection(string title, int y)
+        private int AddSectionHeader(string title, int y, int width)
         {
             Label label = new Label
             {
                 Text = title,
-                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+                Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(20, y)
             };
             Controls.Add(label);
-            return y + 30;
+
+            Panel line = new Panel
+            {
+                Location = new Point(20, y + label.Height + 4),
+                Size = new Size(width, 2)
+            };
+            line.Paint += (sender, e) =>
+            {
+                using (Pen pen = new Pen(ThemeManager.GetColor("border")))
+                {
+                    e.Graphics.DrawLine(pen, 0, 0, line.Width, 0);
+                }
+            };
+            Controls.Add(line);
+            return y + label.Height + 16;
+        }
+
+        /// <summary>
+        /// 控件行高(实际高与 PreferredHeight 取大,高 DPI 下输入框会随字体变高)
+        /// </summary>
+        private static int RowHeight(Control control)
+        {
+            return Math.Max(control.Height, control.PreferredSize.Height);
         }
 
         /// <summary>
@@ -209,8 +282,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 ThemeCard card = new ThemeCard(theme)
                 {
-                    Margin = new Padding(0, 0, 10, 8),
-                    Size = new Size(210, 68),
+                    Margin = new Padding(0, 0, 12, 10),
+                    // 210×2+间距=444:即使竖向滚动条(150% 缩放下约 26px)吃掉宽度,两列也不会溢出横向滚动条
+                    Size = new Size(210, 86),
                     Selected = theme.Id == ThemeManager.Current.Id
                 };
                 card.CardClicked += (sender, themeId) =>
@@ -263,6 +337,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         {
             private readonly Theme _theme;
             private bool _selected;
+            private bool _hover;
 
             /// <summary>
             /// 卡片被点击(参数为主题 id)
@@ -276,6 +351,21 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 _theme = theme;
                 Cursor = Cursors.Hand;
+                MouseEnter += (sender, e) => SetHover(true);
+                MouseLeave += (sender, e) => SetHover(false);
+            }
+
+            /// <summary>
+            /// 悬停态变化时重绘
+            /// </summary>
+            private void SetHover(bool hover)
+            {
+                if (_hover == hover)
+                {
+                    return;
+                }
+                _hover = hover;
+                Invalidate();
             }
 
             /// <summary>
@@ -295,7 +385,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             }
 
             /// <summary>
-            /// 自绘卡片
+            /// 自绘卡片:壁纸/强调色条 + 名称 + 身份描述 + 三色点
             /// </summary>
             protected override void OnPaint(PaintEventArgs e)
             {
@@ -304,32 +394,91 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 string windowBack = _theme.Colors.TryGetValue("windowBack", out string? wb) ? wb : "#FFFFFF";
                 string accent = _theme.Colors.TryGetValue("accent", out string? ac) ? ac : "#007ACC";
                 string text = _theme.Colors.TryGetValue("text", out string? tx) ? tx : "#202226";
+                string textSecondary = _theme.Colors.TryGetValue("textSecondary", out string? ts) ? ts : text;
                 string glow = _theme.Chrome != null && !string.IsNullOrWhiteSpace(_theme.Chrome.Glow) ? _theme.Chrome.Glow : accent;
                 Color backColor = ColorTranslator.FromHtml(windowBack);
                 Color accentColor = ColorTranslator.FromHtml(accent);
                 Color textColor = ColorTranslator.FromHtml(text);
+                Color mutedColor = ColorTranslator.FromHtml(textSecondary);
                 Color glowColor = ColorTranslator.FromHtml(glow);
 
                 using (SolidBrush backBrush = new SolidBrush(backColor))
                 using (SolidBrush accentBrush = new SolidBrush(accentColor))
-                using (SolidBrush textBrush = new SolidBrush(textColor))
-                using (Pen borderPen = new Pen(_selected ? glowColor : SystemColors.ControlDark, _selected ? 2F : 1F))
-                using (Font font = new Font("Microsoft YaHei UI", 9.5F))
+                using (Pen borderPen = BuildBorderPen(glowColor))
+                using (Font nameFont = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold))
+                using (Font descFont = new Font("Microsoft YaHei UI", 8.25F))
                 {
                     g.FillRectangle(backBrush, ClientRectangle);
                     Image? wallpaper = _theme.Chrome == null ? null : ChromeAssets.GetWallpaper(_theme.Chrome.Wallpaper);
                     if (wallpaper != null)
                     {
-                        g.DrawImage(wallpaper, new Rectangle(1, 1, Width - 2, 26));
+                        g.DrawImage(wallpaper, new Rectangle(1, 1, Width - 2, 22));
                     }
                     else
                     {
-                        g.FillRectangle(accentBrush, new Rectangle(1, 1, Width - 2, 8));
+                        g.FillRectangle(accentBrush, new Rectangle(1, 1, Width - 2, 6));
                     }
+
+                    TextRenderer.DrawText(
+                        g,
+                        _theme.Name,
+                        nameFont,
+                        new Rectangle(10, 28, Width - 78, 20),
+                        textColor,
+                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(
+                        g,
+                        _theme.Description ?? string.Empty,
+                        descFont,
+                        new Rectangle(10, 50, Width - 78, 18),
+                        mutedColor,
+                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+
+                    DrawIdentityDot(g, Width - 64, 33, accentColor);
+                    DrawIdentityDot(g, Width - 48, 33, PaletteColor(0, accentColor));
+                    DrawIdentityDot(g, Width - 32, 33, PaletteColor(1, accentColor));
+
                     g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
-                    g.FillRectangle(accentBrush, new Rectangle(8, 36, 18, 18));
-                    g.DrawString(_theme.Name, font, textBrush, new PointF(34, 36));
                 }
+            }
+
+            /// <summary>
+            /// 分类色板取色(越界或非法回退强调色)
+            /// </summary>
+            private Color PaletteColor(int index, Color fallback)
+            {
+                if (_theme.CategoryPalette.Count > index && ThemeManager.TryParseColor(_theme.CategoryPalette[index], out Color color))
+                {
+                    return color;
+                }
+                return fallback;
+            }
+
+            /// <summary>
+            /// 10px 身份色点
+            /// </summary>
+            private static void DrawIdentityDot(Graphics g, int x, int y, Color color)
+            {
+                using (SolidBrush brush = new SolidBrush(color))
+                {
+                    g.FillEllipse(brush, x, y, 10, 10);
+                }
+            }
+
+            /// <summary>
+            /// 边框：选中=辉光 2px,悬停=辉光 1.5px,常态=主题边框令牌 1px
+            /// </summary>
+            private Pen BuildBorderPen(Color glowColor)
+            {
+                if (_selected)
+                {
+                    return new Pen(glowColor, 2F);
+                }
+                if (_hover)
+                {
+                    return new Pen(glowColor, 1.5F);
+                }
+                return new Pen(ThemeManager.GetColor("border"), 1F);
             }
 
             /// <summary>

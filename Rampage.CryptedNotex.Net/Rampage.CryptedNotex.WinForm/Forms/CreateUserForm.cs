@@ -15,6 +15,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
     public class CreateUserForm : NotexFormBase
     {
         private readonly CryptoSession _session;
+        private readonly string _welcomeText;
 
         private Panel _card = null!;
         private Label _titleLabel = null!;
@@ -36,9 +37,13 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         /// <param name="app">应用上下文</param>
         /// <param name="session">加密会话</param>
-        public CreateUserForm(IRampageApplication app, CryptoSession session) : base(app)
+        /// <param name="firstRun">true=首运行向导文案;false=登录窗添加用户文案</param>
+        public CreateUserForm(IRampageApplication app, CryptoSession session, bool firstRun = true) : base(app)
         {
             _session = session;
+            _welcomeText = firstRun
+                ? "首次使用请创建账户。密码会加密全部笔记。\n忘记密码 = 数据无法恢复，没有后门。"
+                : "为这台设备再添加一个账户。\n每个账户独立密码，笔记互相隔离。";
             Text = NotexBrand.DisplayName + " · 创建用户";
             Tag = "theme:wallpaper";
             ClientSize = new Size(560, 720);
@@ -71,7 +76,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _welcomeLabel = new Label
             {
-                Text = "首次使用请创建账户。密码会加密全部笔记。\n忘记密码 = 数据无法恢复，没有后门。",
+                Text = _welcomeText,
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(404, 0)

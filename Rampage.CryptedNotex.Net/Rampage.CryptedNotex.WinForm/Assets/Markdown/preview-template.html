@@ -29,10 +29,21 @@ window.renderMarkdown = function (text) {
     });
   }
 };
-window.setThemeMode = function (mode) {
+window.setThemeMode = function (mode, back, text) {
   var dark = mode === 'dark';
   document.body.classList.toggle('dark', dark);
   document.getElementById('mdStyle').href = 'https://notex-assets/github-markdown-' + (dark ? 'dark' : 'light') + '.css';
+  // 主题画布着色:提供 back 时把画布底色与正文色覆盖为主题家族色(如羊皮纸的暖黄纸面)
+  var content = document.getElementById('content');
+  if (back) {
+    document.documentElement.style.background = back;
+    document.body.style.background = back;
+    if (text) { content.style.color = text; }
+  } else {
+    document.documentElement.style.background = '';
+    document.body.style.background = '';
+    content.style.color = '';
+  }
 };
 </script>
 </body>

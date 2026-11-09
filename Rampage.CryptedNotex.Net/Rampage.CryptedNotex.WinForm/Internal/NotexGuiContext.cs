@@ -57,16 +57,35 @@ namespace Rampage.CryptedNotex.WinForm.Internal
             main.FormClosed += (sender, e) =>
             {
                 _session.Lock();
-                if (main.ExitReason == MainExitReason.Logout || main.ExitReason == MainExitReason.AutoLocked)
+                MainExitReason reason = main.ExitReason;
+                // FormClosed 触发时主窗体的关闭流程(WM_CLOSE 调用栈)尚未走完,此刻同步弹登录
+                // 会用新的模态循环打断关闭栈,旧主窗僵在屏幕上;推迟到消息队列下一拍,让主窗先完全消失
+                System.Threading.SynchronizationContext? context = System.Threading.SynchronizationContext.Current;
+                if (context != null)
                 {
-                    ShowEntry();
+                    context.Post(_ => ContinueAfterMainClosed(reason), null);
                 }
                 else
                 {
-                    ExitThread();
+                    ContinueAfterMainClosed(reason);
                 }
             };
             main.Show();
+        }
+
+        /// <summary>
+        /// 主窗体完全关闭后的去向
+        /// </summary>
+        private void ContinueAfterMainClosed(MainExitReason reason)
+        {
+            if (reason == MainExitReason.Logout || reason == MainExitReason.AutoLocked)
+            {
+                ShowEntry();
+            }
+            else
+            {
+                ExitThread();
+            }
         }
 
         /// <summary>

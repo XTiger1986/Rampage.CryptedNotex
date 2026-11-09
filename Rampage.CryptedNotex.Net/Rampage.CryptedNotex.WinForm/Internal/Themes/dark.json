@@ -1,6 +1,7 @@
 {
   "id": "dark",
   "name": "深色",
+  "description": "低光环境 · 护眼深色",
   "darkTitleBar": true,
   "colors": {
     "windowBack": "#1E1E1E",
@@ -15,13 +16,15 @@
     "accentText": "#FFFFFF",
     "selectionBack": "#094771",
     "pinnedMark": "#FFB900",
-    "trashTint": "#5A3A3A",
+    "trashTint": "#CE9C9C",
     "warning": "#D7BA7D",
-    "danger": "#F14C4C",
+    "danger": "#D23F3F",
+    "dangerText": "#FFFFFF",
+    "success": "#4EC98A",
     "link": "#4EC9B0",
     "editorBack": "#1E1E1E",
     "editorText": "#D4D4D4",
-    "previewBack": "#FFFFFF"
+    "previewBack": "#161B22"
   },
   "fonts": {
     "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },

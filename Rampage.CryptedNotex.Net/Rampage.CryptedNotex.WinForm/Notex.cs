@@ -60,6 +60,8 @@ namespace Rampage.CryptedNotex.WinForm
         private SplitContainer _innerSplit = null!;
         private ImageList? _categoryRowImages;
         private ImageList? _noteRowImages;
+        private int _categoryHoverIndex = -1;
+        private int _noteHoverIndex = -1;
         private int _statusBusy;
         private int _listRequestId;
         private int _noteRequestId;
@@ -67,6 +69,7 @@ namespace Rampage.CryptedNotex.WinForm
         private bool _closing;
         private bool _announceNextSave;
         private bool _suppressSearch;
+        private Size _clientSize;
         private Task _saveQueue = Task.CompletedTask;
 
         private ContextMenuStrip _categoryMenu = null!;
@@ -115,7 +118,12 @@ namespace Rampage.CryptedNotex.WinForm
             _session = session;
             Text = NotexBrand.DisplayName + " - " + (session.User?.DisplayName ?? string.Empty);
             Tag = "theme:wallpaper";
-            ClientSize = new Size(1180, 700);
+            // 默认尺寸随主屏工作区走(9/10,1180x700 为下限):高分屏上编辑器列不再被写死的尺寸挤小
+            Rectangle workArea = Screen.PrimaryScreen!.WorkingArea;
+            _clientSize = new Size(
+                Math.Max(1180, workArea.Width * 9 / 10),
+                Math.Max(700, workArea.Height * 9 / 10));
+            ClientSize = _clientSize;
             MinimumSize = new Size(940, 560);
             StartPosition = FormStartPosition.CenterScreen;
             BuildUi();
@@ -128,7 +136,7 @@ namespace Rampage.CryptedNotex.WinForm
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            ClientSize = new Size(1180, 700);
+            ClientSize = _clientSize;
             ApplySplitDistances();
             FitNoteColumns();
         }
@@ -407,6 +415,8 @@ namespace Rampage.CryptedNotex.WinForm
             _categoryList.DrawColumnHeader += (sender, e) => e.DrawDefault = true;
             _categoryList.SelectedIndexChanged += OnCategorySelected;
             _categoryList.MouseUp += CategoryListMouseUp;
+            _categoryList.MouseMove += (sender, e) => UpdateListHover(_categoryList, ref _categoryHoverIndex, e.Location);
+            _categoryList.MouseLeave += (sender, e) => UpdateListHover(_categoryList, ref _categoryHoverIndex, new Point(-1, -1));
             grid.Controls.Add(_categoryList, 0, 2);
 
             TableLayoutPanel bottomPanel = new TableLayoutPanel
@@ -575,6 +585,8 @@ namespace Rampage.CryptedNotex.WinForm
             _noteList.DrawColumnHeader += NoteListDrawHeader;
             _noteList.SelectedIndexChanged += OnNoteSelected;
             _noteList.MouseUp += NoteListMouseUp;
+            _noteList.MouseMove += (sender, e) => UpdateListHover(_noteList, ref _noteHoverIndex, e.Location);
+            _noteList.MouseLeave += (sender, e) => UpdateListHover(_noteList, ref _noteHoverIndex, new Point(-1, -1));
             _noteList.DoubleClick += (sender, e) => EnterEdit();
 
             Panel listHost = new Panel
@@ -1246,13 +1258,13 @@ namespace Rampage.CryptedNotex.WinForm
         {
             if (_searchKeyword.Length > 0)
             {
-                return "没有标题包含「" + _searchKeyword + "」的笔记";
+                return "没有标题包含「" + _searchKeyword + "」的笔记\n换个关键词，或清空搜索框";
             }
             if (_trashView)
             {
-                return "回收站是空的";
+                return "回收站是空的\n删除的笔记会先到这里，可恢复或彻底删除";
             }
-            return "这个分类还没有笔记";
+            return "这个分类还没有笔记\n点上方「新建笔记」开始记录";
         }
 
         /// <summary>
@@ -1315,6 +1327,29 @@ namespace Rampage.CryptedNotex.WinForm
         }
 
         /// <summary>
+        /// owner-draw 列表悬停行追踪：命中行变化时只重绘新旧两行
+        /// </summary>
+        private static void UpdateListHover(ListView list, ref int hovered, Point location)
+        {
+            ListViewItem? hit = location.X >= 0 ? list.GetItemAt(location.X, location.Y) : null;
+            int index = hit?.Index ?? -1;
+            if (index == hovered)
+            {
+                return;
+            }
+            int previous = hovered;
+            hovered = index;
+            if (previous >= 0 && previous < list.Items.Count)
+            {
+                list.Invalidate(list.GetItemRect(previous));
+            }
+            if (index >= 0 && index < list.Items.Count)
+            {
+                list.Invalidate(list.GetItemRect(index));
+            }
+        }
+
+        /// <summary>
         /// 分类行：色点、默认分类环、独立密码锁
         /// </summary>
         private void CategoryDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
@@ -1326,12 +1361,20 @@ namespace Rampage.CryptedNotex.WinForm
 
             Category? category = e.Item.Tag as Category;
             bool selected = e.Item.Selected;
+            bool hovered = !selected && e.Item.Index == _categoryHoverIndex;
             Color back = selected
                 ? Internal.Themes.ThemeManager.GetColor("selectionBack")
                 : Internal.Themes.ThemeManager.GetColor("panelAltBack");
             using (SolidBrush brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            if (hovered)
+            {
+                using (SolidBrush hoverBrush = new SolidBrush(Internal.Themes.ChromePainter.RowHoverColor()))
+                {
+                    e.Graphics.FillRectangle(hoverBrush, e.Bounds);
+                }
             }
 
             Color dot = Internal.Themes.ThemeManager.GetCategoryColor(e.Item.Index);
@@ -1405,6 +1448,7 @@ namespace Rampage.CryptedNotex.WinForm
 
             Note? note = e.Item.Tag as Note;
             bool selected = e.Item.Selected;
+            bool hovered = !selected && e.Item.Index == _noteHoverIndex;
             Color back = selected
                 ? Internal.Themes.ThemeManager.GetColor("selectionBack")
                 : Internal.Themes.ThemeManager.GetColor("panelAltBack");
@@ -1421,6 +1465,13 @@ namespace Rampage.CryptedNotex.WinForm
             using (SolidBrush brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+            if (hovered)
+            {
+                using (SolidBrush hoverBrush = new SolidBrush(Internal.Themes.ChromePainter.RowHoverColor()))
+                {
+                    e.Graphics.FillRectangle(hoverBrush, e.Bounds);
+                }
             }
 
             Rectangle textRect = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);

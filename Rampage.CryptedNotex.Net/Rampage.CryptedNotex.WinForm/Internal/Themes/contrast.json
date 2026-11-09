@@ -1,6 +1,7 @@
 {
   "id": "contrast",
   "name": "高对比",
+  "description": "黑白金 · 最大可读性",
   "darkTitleBar": true,
   "colors": {
     "windowBack": "#000000",
@@ -15,9 +16,11 @@
     "accentText": "#000000",
     "selectionBack": "#0045AD",
     "pinnedMark": "#FFD700",
-    "trashTint": "#8A5A5A",
+    "trashTint": "#B08080",
     "warning": "#FFD700",
     "danger": "#FF6A5A",
+    "dangerText": "#000000",
+    "success": "#00D060",
     "link": "#66D9FF",
     "editorBack": "#000000",
     "editorText": "#FFFFFF",

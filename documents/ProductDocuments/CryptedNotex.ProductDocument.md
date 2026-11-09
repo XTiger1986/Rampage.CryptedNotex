@@ -219,12 +219,15 @@ Rampage.CryptedNotex.Net\
 
 ### 4.8 主题系统
 
-- JSON 主题：`id/name/darkTitleBar/colors(20+ 键)/fonts/categoryPalette(8 色板)`，可选 `chrome`（`metal` none/silver/black、`wallpaper`、`glow`）（Schema 见附录）；
+- JSON 主题：`id/name/description(一句身份描述)/darkTitleBar/colors(21 键,含 dangerText、success)/fonts(categoryPalette 8 色板)`，可选 `chrome`（`metal` none/silver/black、`wallpaper`、`glow`）（Schema 见附录）；
+- `fonts.ui`（窗体基础字体）与 `fonts.listTitle`（列表字体）随主题应用；全部颜色配对（文字/底色、按钮、链接、回收站行、提示条）按 WCAG AA ≥4.5 校验通过；
 - 内嵌扁平 6 套：light 浅色 / dark 深色 / forest 墨绿 / parchment 羊皮纸 / violet 紫罗兰 / contrast 高对比；
 - 内嵌金属 5 套：invader 入侵者 / alienmorph 异形形态 / darkstar 暗星 / alx ALX / xenomorph 异形。新用户与尚未写入的全局默认主题为 xenomorph；已保存的偏好不改；
 - 金属主题用原创徽记、拉丝底和壁纸（不使用第三方外壳商标）。编辑器正文区仍是纯色，壁纸只出现在窗体边缘和登录底；
 - exe 旁 `themes\*.json` 按 id 覆盖或追加自定义主题；
-- 登录前使用全局默认主题（setting 表），登录后读取个人偏好；实时切换（含暗色标题栏 DWM 处理）；
+- 登录前使用全局默认主题（setting 表），登录后读取个人偏好；实时切换（暗色标题栏 DWM 双向处理，暗→亮会写回浅色）；
+- Markdown 预览画布按 `previewBack` 亮度自动选明暗 CSS，并把画布底/正文色着色为主题家族色；
+- 暗色主题的系统滚动条与下拉切到 DarkMode_Explorer 资源，浅色切回默认；
 - 分类色：色板按分类序号取模，用于侧栏色点与列表标记。
 
 ### 4.9 设置
@@ -296,6 +299,8 @@ Rampage.CryptedNotex.Net\
 ### 6.4 视觉
 
 登录与首运行是壁纸上的金属卡片，顶部为档案徽记和「秘密档案」。主窗体三栏外留一圈壁纸；侧栏为金属品牌条、分类色点和绘制的锁；列表行自绘（置顶菱形、选中光）。扁平主题不加载壁纸，只换配色。
+
+交互光影语言：「光」是界面的反馈动词——悬停点亮辉光（金属主题普通按钮悬停时边缘亮起主题辉光，强调按钮辉光加粗），按下时光熄灭下沉；列表行悬停有选中色洗版高亮；输入框聚焦时底色向强调色轻微混合。设置窗主题画廊为富预览卡片（壁纸条 + 名称 + 一句身份描述 + 三色点），点击即时全窗体生效。
 
 ---
 

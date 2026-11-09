@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Rampage.CryptedNotex.WinForm.Internal.Themes
@@ -12,6 +13,34 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
     internal static class ChromePainter
     {
         private static readonly ConditionalWeakTable<Control, object> _hooks = new ConditionalWeakTable<Control, object>();
+        private static readonly ConditionalWeakTable<Button, ButtonState> _buttonStates = new ConditionalWeakTable<Button, ButtonState>();
+
+        /// <summary>
+        /// 按钮按下态(悬停态无状态,绘制时按光标位置现场判定)
+        /// </summary>
+        private sealed class ButtonState
+        {
+            /// <summary>
+            /// 鼠标按下中
+            /// </summary>
+            public bool Pressed;
+        }
+
+        /// <summary>
+        /// 列表行悬停色：选中色的半透明洗版,铺在行底色上,金属与扁平主题通用
+        /// </summary>
+        public static Color RowHoverColor()
+        {
+            return Color.FromArgb(64, ThemeManager.GetColor("selectionBack"));
+        }
+
+        /// <summary>
+        /// 按钮是否处于悬停(无状态判定,绘制期按光标与客户区的关系得出)
+        /// </summary>
+        public static bool IsButtonHover(Button button)
+        {
+            return button.Enabled && button.ClientRectangle.Contains(button.PointToClient(Cursor.Position));
+        }
 
         /// <summary>
         /// 当前主题是否启用金属质感(metal 不是 none)
@@ -139,12 +168,19 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             if (control is Button button)
             {
                 Color fill = ButtonFill(button);
-                button.FlatAppearance.MouseOverBackColor = fill;
-                button.FlatAppearance.MouseDownBackColor = fill;
                 if (UsesChrome)
                 {
+                    // 金属模式由 OnButtonPaint 全权绘制,FlatAppearance 与底色保持一致避免系统态闪边
+                    button.FlatAppearance.MouseOverBackColor = fill;
+                    button.FlatAppearance.MouseDownBackColor = fill;
                     button.BackColor = fill;
                     button.ForeColor = ButtonFore(button);
+                }
+                else
+                {
+                    // 扁平模式：悬停提亮、按下压暗,运行时派生,不新增主题令牌
+                    button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fill, 0.18f);
+                    button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(fill, 0.12f);
                 }
             }
 
@@ -168,12 +204,79 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 button.FlatStyle = FlatStyle.Flat;
                 button.FlatAppearance.BorderSize = 0;
                 button.Paint += OnButtonPaint;
+                // 悬停/按下反馈需要重绘时机：进入/离开/按下/抬起都触发一次失效
+                ButtonState state = _buttonStates.GetValue(button, _ => new ButtonState());
+                button.MouseEnter += (sender, e) => button.Invalidate();
+                button.MouseLeave += (sender, e) =>
+                {
+                    state.Pressed = false;
+                    button.Invalidate();
+                };
+                button.MouseDown += (sender, e) =>
+                {
+                    state.Pressed = true;
+                    button.Invalidate();
+                };
+                button.MouseUp += (sender, e) =>
+                {
+                    state.Pressed = false;
+                    button.Invalidate();
+                };
             }
             else if (IsSurfaceTag(control.Tag as string))
             {
                 EnableTransparent(control);
                 control.Paint += OnSurfacePaint;
             }
+
+            // 暗色主题下把系统滚动条/下拉切到 Windows 暗色资源(DarkMode_Explorer),浅色切回默认
+            if (control is ListView || control is ListBox || control is TextBox || control is TreeView || control is ComboBox)
+            {
+                control.HandleCreated += (sender, e) => ApplyScrollbarTheme(control);
+                if (control.IsHandleCreated)
+                {
+                    ApplyScrollbarTheme(control);
+                }
+            }
+
+            // 输入框聚焦辉光:聚焦时底色向强调色轻微混合,失焦还原
+            if (control is TextBox input)
+            {
+                input.GotFocus += (sender, e) => input.BackColor = InputBackColor(true);
+                input.LostFocus += (sender, e) => input.BackColor = InputBackColor(false);
+            }
+        }
+
+        /// <summary>
+        /// 滚动条/下拉的系统主题(暗色主题用 DarkMode_Explorer 资源;失败静默保持系统默认)
+        /// </summary>
+        private static void ApplyScrollbarTheme(Control control)
+        {
+            try
+            {
+                SetWindowTheme(control.Handle, ThemeManager.Current.DarkTitleBar ? "DarkMode_Explorer" : string.Empty, null);
+            }
+            catch
+            {
+                // 旧系统无 uxtheme 支持,忽略
+            }
+        }
+
+        /// <summary>
+        /// 输入框底色:聚焦时向强调色混合 28%,给出可见的焦点辉光
+        /// </summary>
+        public static Color InputBackColor(bool focused)
+        {
+            Color back = ThemeManager.GetColor("inputBack");
+            if (!focused)
+            {
+                return back;
+            }
+            Color accent = ThemeManager.GetColor("accent");
+            return Color.FromArgb(
+                back.R + (accent.R - back.R) * 28 / 100,
+                back.G + (accent.G - back.G) * 28 / 100,
+                back.B + (accent.B - back.B) * 28 / 100);
         }
 
         /// <summary>
@@ -209,7 +312,18 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             string? tag = button.Tag as string;
             bool accent = tag == "theme:accent" && button.Enabled;
             bool danger = tag == "theme:danger" && button.Enabled;
+            bool hover = IsButtonHover(button);
+            ButtonState state = _buttonStates.GetValue(button, _ => new ButtonState());
+            bool pressed = state.Pressed && hover;
             Color fill = ButtonFill(button);
+            if (pressed)
+            {
+                fill = ControlPaint.Dark(fill, 0.08f);
+            }
+            else if (hover && (accent || danger))
+            {
+                fill = ControlPaint.Light(fill, 0.08f);
+            }
             Color fore = ButtonFore(button);
             Color glow = GlowColor();
 
@@ -230,11 +344,16 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 }
             }
 
-            using (Pen highlight = new Pen(Color.FromArgb(accent || danger ? 80 : 110, Color.White)))
-            using (Pen shadow = new Pen(Color.FromArgb(90, Color.Black)))
-            using (Pen edge = new Pen(accent || danger ? glow : ThemeManager.GetColor("border")))
+            // 光影语言：悬停=顶部高光提亮、普通按钮边缘点亮为主题辉光；按下=高光熄灭下沉
+            int highlightAlpha = pressed ? 0 : (hover ? 150 : 110);
+            using (Pen highlight = new Pen(Color.FromArgb(accent || danger ? 80 : highlightAlpha, Color.White), highlightAlpha > 0 ? 1F : 0.01F))
+            using (Pen shadow = new Pen(Color.FromArgb(pressed ? 120 : 90, Color.Black)))
+            using (Pen edge = BuildEdgePen(glow, accent || danger, hover, pressed))
             {
-                g.DrawLine(highlight, 1, 1, rect.Width - 2, 1);
+                if (highlightAlpha > 0)
+                {
+                    g.DrawLine(highlight, 1, 1, rect.Width - 2, 1);
+                }
                 g.DrawLine(shadow, 1, rect.Height - 2, rect.Width - 2, rect.Height - 2);
                 g.DrawRectangle(edge, 0, 0, rect.Width - 1, rect.Height - 1);
             }
@@ -373,6 +492,26 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         }
 
         /// <summary>
+        /// 按钮边缘笔：强调/危险按钮常辉光,普通按钮悬停时点亮辉光,按下时辉光转暗
+        /// </summary>
+        private static Pen BuildEdgePen(Color glow, bool glowing, bool hover, bool pressed)
+        {
+            if (glowing)
+            {
+                if (pressed)
+                {
+                    return new Pen(Color.FromArgb(130, glow), 1F);
+                }
+                return hover ? new Pen(glow, 2F) : new Pen(glow, 1F);
+            }
+            if (hover && !pressed)
+            {
+                return new Pen(glow, 1.4F);
+            }
+            return new Pen(ThemeManager.GetColor("border"), 1F);
+        }
+
+        /// <summary>
         /// 按钮填充色
         /// </summary>
         private static Color ButtonFill(Button button)
@@ -394,14 +533,14 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         }
 
         /// <summary>
-        /// 按钮文字色。危险按钮固定白字，避免亮色强调主题把字画成深色。
+        /// 按钮文字色。危险按钮默认白字,主题可通过 dangerText 令牌覆盖。
         /// </summary>
         private static Color ButtonFore(Button button)
         {
             string? tag = button.Tag as string;
             if (tag == "theme:danger")
             {
-                return Color.White;
+                return ThemeManager.GetColor("dangerText");
             }
             if (tag == "theme:accent")
             {
@@ -447,6 +586,12 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 control,
                 new object[] { true });
         }
+
+        /// <summary>
+        /// 切换控件系统视觉主题(滚动条/下拉配色)
+        /// </summary>
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+        private static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
     }
 
     /// <summary>

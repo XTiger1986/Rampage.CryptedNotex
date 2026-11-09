@@ -1,6 +1,7 @@
 {
   "id": "darkstar",
   "name": "暗星",
+  "description": "拉丝黑 · 警报赤辉",
   "darkTitleBar": true,
   "chrome": { "metal": "black", "wallpaper": "darkstar", "glow": "#FF2A3A" },
   "colors": {
@@ -18,7 +19,9 @@
     "pinnedMark": "#E0B15A",
     "trashTint": "#E08A8A",
     "warning": "#E0B15A",
-    "danger": "#FF4D4D",
+    "danger": "#D93A3A",
+    "dangerText": "#FFFFFF",
+    "success": "#3FC47A",
     "link": "#FF8A8A",
     "editorBack": "#120C0E",
     "editorText": "#F3E8EA",

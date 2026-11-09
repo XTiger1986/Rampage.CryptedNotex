@@ -1,6 +1,7 @@
 {
   "id": "forest",
   "name": "墨绿",
+  "description": "沉静墨绿 · 暗夜护眼",
   "darkTitleBar": true,
   "colors": {
     "windowBack": "#1B2621",
@@ -15,13 +16,15 @@
     "accentText": "#0E1512",
     "selectionBack": "#2E5A42",
     "pinnedMark": "#D9B85C",
-    "trashTint": "#57443F",
+    "trashTint": "#BFA093",
     "warning": "#D9B85C",
-    "danger": "#E0705F",
+    "danger": "#BC4F3D",
+    "dangerText": "#FFFFFF",
+    "success": "#7CCBA0",
     "link": "#7CCBA0",
     "editorBack": "#1B2621",
     "editorText": "#D6E3DB",
-    "previewBack": "#FFFFFF"
+    "previewBack": "#1B2621"
   },
   "fonts": {
     "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },

@@ -34,6 +34,11 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         public string Name { get; set; } = "浅色";
 
         /// <summary>
+        /// 一句身份描述(主题画廊展示;旧 JSON 可缺省)
+        /// </summary>
+        public string? Description { get; set; }
+
+        /// <summary>
         /// 是否启用深色标题栏(DwmSetWindowAttribute,Win11/较新 Win10 生效)
         /// </summary>
         public bool DarkTitleBar { get; set; }

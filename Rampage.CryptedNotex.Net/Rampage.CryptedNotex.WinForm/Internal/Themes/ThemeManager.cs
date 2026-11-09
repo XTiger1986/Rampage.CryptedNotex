@@ -18,8 +18,8 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
     /// windowBack 窗体底 / panelBack 面板底 / panelAltBack 列表底 / border 边框 /
     /// inputBack 输入底 / inputBorder 输入边框 / text 主文本 / textSecondary 次文本 /
     /// accent 强调色 / accentText 强调色上的文本 / selectionBack 选中底 /
-    /// pinnedMark 置顶标记 / trashTint 回收站色 / warning 警示 / danger 危险 / link 链接 /
-    /// editorBack 编辑器底 / editorText 编辑器文本 / previewBack 预览底。
+    /// pinnedMark 置顶标记 / trashTint 回收站色 / warning 警示 / danger 危险 / dangerText 危险色上的文本 /
+    /// success 成功 / link 链接 / editorBack 编辑器底 / editorText 编辑器文本 / previewBack 预览底。
     /// 控件 Tag 约定："theme:accent" 强调按钮、"theme:muted" 次要文本、"theme:danger" 危险按钮、
     /// "theme:panelAlt" 列表底、"theme:editor" 编辑器底。
     /// </remarks>
@@ -190,12 +190,14 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             {
                 form.BackColor = GetColor("windowBack");
                 form.ForeColor = text;
+                // fonts.ui 令牌:窗体基础字体(未显式指定字体的控件随之变化,contrast 主题的大字号由此生效)
+                form.Font = GetFont("ui");
                 ApplyTitleBar(form);
             }
             else if (control is TextBox textBox)
             {
                 textBox.BorderStyle = BorderStyle.FixedSingle;
-                textBox.BackColor = GetColor("inputBack");
+                textBox.BackColor = ChromePainter.InputBackColor(textBox.Focused);
                 textBox.ForeColor = text;
             }
             else if (control is RichTextBox)
@@ -206,28 +208,32 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             else if (control is Button button)
             {
                 button.FlatStyle = FlatStyle.Flat;
-                button.FlatAppearance.BorderColor = GetColor("border");
                 button.Cursor = Cursors.Hand;
                 if (tag == "theme:accent")
                 {
                     button.BackColor = GetColor("accent");
                     button.ForeColor = GetColor("accentText");
+                    button.FlatAppearance.BorderColor = GetColor("accent");
                 }
                 else if (tag == "theme:danger")
                 {
                     button.BackColor = GetColor("danger");
-                    button.ForeColor = Color.White;
+                    button.ForeColor = GetColor("dangerText");
+                    button.FlatAppearance.BorderColor = GetColor("danger");
                 }
                 else
                 {
                     button.BackColor = panelBack;
                     button.ForeColor = text;
+                    button.FlatAppearance.BorderColor = GetColor("border");
                 }
             }
             else if (control is ListView || control is ListBox || control is TreeView)
             {
                 control.BackColor = panelAltBack;
                 control.ForeColor = text;
+                // fonts.listTitle 令牌:列表字体统一走主题
+                control.Font = GetFont("listTitle");
             }
             else if (control is Label || control is LinkLabel)
             {
@@ -263,18 +269,19 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         }
 
         /// <summary>
-        /// 深色标题栏(DWM 属性 20,失败回退 19,再失败静默保持系统标题栏)
+        /// 深浅标题栏双向切换(DWM 属性 20,失败回退 19,再失败静默保持系统标题栏)。
+        /// 暗色写 1,浅色必须写回 0,否则从暗主题切回浅主题后标题栏残留暗色。
         /// </summary>
         private static void ApplyTitleBar(Form form)
         {
-            if (!Current.DarkTitleBar)
+            if (!form.IsHandleCreated)
             {
                 return;
             }
 
             try
             {
-                int dark = 1;
+                int dark = Current.DarkTitleBar ? 1 : 0;
                 if (DwmSetWindowAttribute(form.Handle, 20, ref dark, sizeof(int)) != 0)
                 {
                     DwmSetWindowAttribute(form.Handle, 19, ref dark, sizeof(int));
@@ -349,6 +356,8 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 "trashTint" => Color.FromArgb(146, 110, 110),
                 "warning" => Color.FromArgb(156, 116, 33),
                 "danger" => Color.FromArgb(200, 60, 52),
+                "dangerText" => Color.White,
+                "success" => Color.FromArgb(46, 160, 90),
                 "link" => Color.FromArgb(0, 102, 170),
                 "editorBack" => Color.White,
                 "editorText" => Color.FromArgb(32, 34, 38),

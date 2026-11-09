@@ -13,7 +13,13 @@ namespace Rampage.CryptedNotex.WinForm.Forms
     /// </summary>
     public class AboutForm : NotexFormBase
     {
+        private PictureBox _emblem = null!;
+        private Label _titleLabel = null!;
+        private Label _techLabel = null!;
+        private Label _infoLabel = null!;
+        private Button _selfTestButton = null!;
         private Label _resultLabel = null!;
+        private Size _clientSize;
 
         /// <summary>
         /// 构造关于窗体
@@ -31,37 +37,35 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 构建界面
+        /// 构建界面(控件只创建,位置交给 <see cref="LayoutCard"/> 统一流动排版)
         /// </summary>
         private void BuildUi()
         {
-            PictureBox emblem = new PictureBox
+            _emblem = new PictureBox
             {
                 Tag = "theme:emblem",
-                Location = new Point(16, 16),
                 Size = new Size(64, 64)
             };
-            Controls.Add(emblem);
+            Controls.Add(_emblem);
 
-            Label titleLabel = new Label
+            _titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
                 Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(96, 22)
+                AutoSize = true
             };
-            Controls.Add(titleLabel);
+            Controls.Add(_titleLabel);
 
-            Label technicalLabel = new Label
+            _techLabel = new Label
             {
                 Text = NotexBrand.TechnicalName,
                 Tag = "theme:muted",
                 AutoSize = true,
-                Location = new Point(98, 56)
+                Font = new Font("Consolas", 9.5F)
             };
-            Controls.Add(technicalLabel);
+            Controls.Add(_techLabel);
 
-            Label infoLabel = new Label
+            _infoLabel = new Label
             {
                 Text = "本地离线加密笔记 · .NET 8 WinForms · SQLite\n" +
                     "加密：PBKDF2-SHA256 派生密钥 + AES-256-GCM(每笔记随机 nonce)\n" +
@@ -70,28 +74,60 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(420, 0),
-                Location = new Point(20, 104)
+                Font = new Font("Microsoft YaHei UI", 9.5F)
             };
-            Controls.Add(infoLabel);
+            Controls.Add(_infoLabel);
 
-            Button selfTestButton = new Button
+            _selfTestButton = new Button
             {
                 Text = "加密自检",
-                Location = new Point(20, 214),
                 Size = new Size(160, 36)
             };
-            selfTestButton.Click += async (sender, e) => await RunSelfTestAsync(selfTestButton);
-            Controls.Add(selfTestButton);
+            _selfTestButton.Click += async (sender, e) => await RunSelfTestAsync(_selfTestButton);
+            Controls.Add(_selfTestButton);
 
             _resultLabel = new Label
             {
                 Text = "用一组临时密钥做往返、错钥、篡改和域分隔检查。不会读写你的笔记。",
                 Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(420, 0),
-                Location = new Point(20, 266)
+                MaximumSize = new Size(420, 0)
             };
             Controls.Add(_resultLabel);
+
+            LayoutCard();
+        }
+
+        /// <summary>
+        /// 按实测控件高度流动排版(兼容高 DPI 字体放大,标题不再压住技术名);
+        /// 自检结果文本变化后也可重调,窗高随内容自适应
+        /// </summary>
+        private void LayoutCard()
+        {
+            int x = 20;
+            int textX = x + 80;
+            _emblem.Location = new Point(x, 20);
+            _titleLabel.Location = new Point(textX, 20);
+            _techLabel.Location = new Point(textX + 2, _titleLabel.Bottom + 4);
+            int headerBottom = Math.Max(_emblem.Bottom, _techLabel.Bottom) + 20;
+
+            _infoLabel.Location = new Point(x, headerBottom);
+            int y = _infoLabel.Bottom + 18;
+            _selfTestButton.Location = new Point(x, y);
+            y += _selfTestButton.Height + 12;
+            _resultLabel.Location = new Point(x, y);
+
+            _clientSize = new Size(460, Math.Max(360, _resultLabel.Bottom + 28));
+            ClientSize = _clientSize;
+        }
+
+        /// <summary>
+        /// 句柄创建后字体已按实际 DPI 定型,重排一次并钉回计算出的尺寸
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            LayoutCard();
         }
 
         /// <summary>
@@ -109,6 +145,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     return;
                 }
                 _resultLabel.Text = summary;
+                LayoutCard();
                 bool passed = summary.StartsWith("全部通过", StringComparison.Ordinal);
                 ShowToast(passed ? "加密自检通过" : summary, passed ? ToastKind.Success : ToastKind.Error);
             }

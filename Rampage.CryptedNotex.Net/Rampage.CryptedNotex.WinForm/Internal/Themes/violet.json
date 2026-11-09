@@ -1,6 +1,7 @@
 {
   "id": "violet",
   "name": "紫罗兰",
+  "description": "低光紫调 · 夜间记录",
   "darkTitleBar": true,
   "colors": {
     "windowBack": "#211B2E",
@@ -15,13 +16,15 @@
     "accentText": "#17111F",
     "selectionBack": "#4A3A73",
     "pinnedMark": "#E0B84C",
-    "trashTint": "#5C3A45",
+    "trashTint": "#CFA3AC",
     "warning": "#D7BA7D",
-    "danger": "#E36868",
+    "danger": "#C94646",
+    "dangerText": "#FFFFFF",
+    "success": "#7BC896",
     "link": "#B49AE8",
     "editorBack": "#211B2E",
     "editorText": "#DCD5EE",
-    "previewBack": "#FFFFFF"
+    "previewBack": "#211B2E"
   },
   "fonts": {
     "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },

@@ -1,6 +1,7 @@
 {
   "id": "xenomorph",
   "name": "异形",
+  "description": "拉丝黑 · 深空青辉",
   "darkTitleBar": true,
   "chrome": { "metal": "black", "wallpaper": "xenomorph", "glow": "#3EC6FF" },
   "colors": {
@@ -18,7 +19,9 @@
     "pinnedMark": "#E6C36A",
     "trashTint": "#E09A9A",
     "warning": "#E0B15A",
-    "danger": "#F05252",
+    "danger": "#D03A3A",
+    "dangerText": "#FFFFFF",
+    "success": "#34D399",
     "link": "#7FD4FF",
     "editorBack": "#0B121C",
     "editorText": "#E6EEF8",

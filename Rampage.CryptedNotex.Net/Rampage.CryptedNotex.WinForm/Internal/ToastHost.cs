@@ -350,13 +350,13 @@ namespace Rampage.CryptedNotex.WinForm.Internal
             }
 
             /// <summary>
-            /// 色条颜色。成功色不在主题表里，用固定绿，深浅底上都看得清。
+            /// 色条颜色。成功色走主题 success 令牌(缺省回退固定绿,深浅底上都看得清)。
             /// </summary>
             private static Color StripeColor(ToastKind kind)
             {
                 return kind switch
                 {
-                    ToastKind.Success => Color.FromArgb(46, 160, 90),
+                    ToastKind.Success => ThemeManager.GetColor("success"),
                     ToastKind.Error => ThemeManager.GetColor("danger"),
                     _ => ThemeManager.GetColor("accent")
                 };

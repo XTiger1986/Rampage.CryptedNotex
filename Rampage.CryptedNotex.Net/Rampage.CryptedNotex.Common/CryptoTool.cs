@@ -19,6 +19,12 @@ namespace Rampage.CryptedNotex.Common
         public const int KDF_ITERATIONS_DEFAULT = 600000;
 
         /// <summary>
+        /// 登录哈希迭代次数，与内容 KDF 对齐(历史值为框架默认 10 万)；
+        /// 老哈希在成功登录时透明升级(SecurityTool.PBKDF2Verify 按哈希串内嵌迭代数校验，天然兼容)
+        /// </summary>
+        public const int LOGIN_HASH_ITERATIONS = 600000;
+
+        /// <summary>
         /// 派生盐字节数
         /// </summary>
         public const int SALT_SIZE = 16;

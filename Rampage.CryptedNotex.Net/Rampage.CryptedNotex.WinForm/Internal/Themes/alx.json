@@ -1,6 +1,7 @@
 {
   "id": "alx",
   "name": "ALX",
+  "description": "拉丝银 · 公务藏蓝",
   "darkTitleBar": false,
   "chrome": { "metal": "silver", "wallpaper": "alx", "glow": "#60A5FA" },
   "colors": {
@@ -19,6 +20,8 @@
     "trashTint": "#A15A5A",
     "warning": "#92600A",
     "danger": "#DC2626",
+    "dangerText": "#FFFFFF",
+    "success": "#15803D",
     "link": "#1D4ED8",
     "editorBack": "#FFFFFF",
     "editorText": "#1A2740",

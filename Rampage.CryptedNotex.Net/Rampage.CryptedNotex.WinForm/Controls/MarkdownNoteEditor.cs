@@ -288,7 +288,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         }
 
         /// <summary>
-        /// 把当前主题明暗模式注入预览页
+        /// 把当前主题的预览画布(previewBack/editorText 令牌)注入预览页;画布亮度自动决定明暗 CSS,预览底色与主题家族一致
         /// </summary>
         private async Task ApplyPreviewThemeAsync()
         {
@@ -297,10 +297,16 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 return;
             }
 
-            string mode = Internal.Themes.ThemeManager.Current.DarkTitleBar ? "dark" : "light";
+            Color canvas = Internal.Themes.ThemeManager.GetColor("previewBack");
+            Color canvasText = Internal.Themes.ThemeManager.GetColor("editorText");
+            string mode = canvas.GetBrightness() < 0.5f ? "dark" : "light";
+            string script = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "window.setThemeMode('{0}', '#{1:X2}{2:X2}{3:X2}', '#{4:X2}{5:X2}{6:X2}')",
+                mode, canvas.R, canvas.G, canvas.B, canvasText.R, canvasText.G, canvasText.B);
             try
             {
-                await _webView.CoreWebView2.ExecuteScriptAsync("window.setThemeMode('" + mode + "')");
+                await _webView.CoreWebView2.ExecuteScriptAsync(script);
             }
             catch (Exception ex)
             {

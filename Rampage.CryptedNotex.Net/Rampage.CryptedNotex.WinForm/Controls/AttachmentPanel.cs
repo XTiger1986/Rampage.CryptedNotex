@@ -117,9 +117,12 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Cursor = Cursors.Hand,
                 Tag = attachment
             };
+            bool hovered = false;
+            chip.MouseEnter += (sender, e) => SetChipHover(chip, ref hovered, true);
+            chip.MouseLeave += (sender, e) => SetChipHover(chip, ref hovered, false);
             chip.Paint += (sender, e) =>
             {
-                using (Pen pen = new Pen(ThemeManager.GetColor("border")))
+                using (Pen pen = new Pen(hovered ? ThemeManager.GetColor("accent") : ThemeManager.GetColor("border"), hovered ? 1.5F : 1F))
                 {
                     e.Graphics.DrawRectangle(pen, 0, 0, chip.Width - 1, chip.Height - 1);
                 }
@@ -132,6 +135,8 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 AutoSize = true,
                 Location = new Point(8, 6)
             };
+            // 子控件上移动会触发父 Panel 的 MouseLeave,这里一并订阅保持悬停态
+            nameLabel.MouseEnter += (sender, e) => SetChipHover(chip, ref hovered, true);
             nameLabel.Click += (sender, e) => OpenAttachmentRequested?.Invoke(this, attachment);
             chip.Controls.Add(nameLabel);
 
@@ -142,11 +147,25 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Location = new Point(nameLabel.Right + 4, 4),
                 Font = new Font("Microsoft YaHei UI", 8F)
             };
+            removeButton.MouseEnter += (sender, e) => SetChipHover(chip, ref hovered, true);
             removeButton.Click += (sender, e) => RemoveAttachmentRequested?.Invoke(this, attachment);
             removeButton.Visible = !_readOnly;
             chip.Controls.Add(removeButton);
             chip.Width = (_readOnly ? nameLabel.Right : removeButton.Right) + 8;
             return chip;
+        }
+
+        /// <summary>
+        /// 切换 chip 悬停态并重绘
+        /// </summary>
+        private static void SetChipHover(Control chip, ref bool hovered, bool value)
+        {
+            if (hovered == value)
+            {
+                return;
+            }
+            hovered = value;
+            chip.Invalidate();
         }
 
         /// <summary>
