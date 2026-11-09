@@ -9,6 +9,16 @@
     <ApplicationIcon>Assets\Chrome\app-icon.ico</ApplicationIcon>
     <!-- WebView2 包自带的 WPF 程序集引用了 WindowsBase 5.0 与框架 WindowsBase 4.0 冲突(MSB3277)；本程序为 WinForms 不使用该程序集,属良性冲突,精准抑制 -->
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <!-- 单文件发布参数:仅在 dotnet publish 时生效,日常 Debug 构建输出不变;原生库(WebView2Loader/e_sqlite3/libSkiaSharp)随包自解压
+         注意:依赖框架发布不支持 EnableCompressionInSingleFile(NETSDK1176,仅自包含可用),故不开启;
+         发布命令须显式 -p:SelfContained=false(.NET 10 SDK 下 -r 默认倾向自包含)
+         禁用 PublishTrimmed/PublishAOT:框架依赖运行时反射与 Reflection.Emit,与裁剪不兼容
+         Single-file publish switches: effective only for dotnet publish (Debug output unchanged); native libs are bundled with self-extract.
+         Note: framework-dependent publishing cannot use EnableCompressionInSingleFile (NETSDK1176, self-contained only);
+         the publish command must pass -p:SelfContained=false explicitly (under the .NET 10 SDK, -r alone leans self-contained).
+         PublishTrimmed/PublishAot must stay off: the framework relies on runtime reflection and Reflection.Emit. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
@@ -44,5 +54,15 @@
   <ItemGroup>
     <Content Include="Assets\Markdown\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- 发布时剔除包附带的 .xml 文档文件(如 Microsoft.Web.WebView2.*.xml),保持"单 exe + config + Assets"的干净产物;
+       本项目没有任何需要随发布携带的 .xml 内容文件,如未来添加须调整此条件
+       Strip package documentation .xml files (e.g. Microsoft.Web.WebView2.*.xml) from publish output to keep the clean
+       "one exe + config + Assets" layout; this app ships no .xml content files - revisit this condition if one is ever added -->
+  <Target Name="ExcludeDocXmlFromPublish" BeforeTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.xml'" />
+    </ItemGroup>
+  </Target>
 
 </Project>

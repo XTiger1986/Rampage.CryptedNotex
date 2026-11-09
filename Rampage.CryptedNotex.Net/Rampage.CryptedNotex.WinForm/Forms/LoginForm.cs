@@ -21,13 +21,18 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private List<UserBriefDto> _users = new List<UserBriefDto>();
 
         private Panel _card = null!;
+        private Label _titleLabel = null!;
+        private Label _subtitleLabel = null!;
+        private Label _userLabel = null!;
         private ListBox _userList = null!;
+        private Label _passwordLabel = null!;
         private TextBox _passwordBox = null!;
         private Button _loginButton = null!;
         private Button _exitButton = null!;
         private Label _hintLabel = null!;
         private Timer _countdownTimer = null!;
         private bool _loggingIn;
+        private Size _clientSize;
 
         /// <summary>
         /// 构造登录窗体
@@ -47,49 +52,44 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 构建壁纸底上的金属登录卡片
+        /// 构建壁纸底上的金属登录卡片（控件只创建，位置交给 <see cref="LayoutCard"/> 统一流动排版）
         /// </summary>
         private void BuildUi()
         {
             _card = new Panel
             {
                 Size = new Size(440, 560),
-                Location = new Point(60, 40),
                 Tag = "theme:cardEmblem"
             };
             Controls.Add(_card);
             Panel card = _card;
 
-            Label titleLabel = new Label
+            _titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
                 Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(28, 108)
+                AutoSize = true
             };
-            card.Controls.Add(titleLabel);
+            card.Controls.Add(_titleLabel);
 
-            Label subtitleLabel = new Label
+            _subtitleLabel = new Label
             {
                 Text = "本地加密笔记，只存在这台设备上",
                 Tag = "theme:muted",
-                AutoSize = true,
-                Location = new Point(30, 142)
+                AutoSize = true
             };
-            card.Controls.Add(subtitleLabel);
+            card.Controls.Add(_subtitleLabel);
 
-            Label userLabel = new Label
+            _userLabel = new Label
             {
                 Text = "选择用户",
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(28, 176)
+                AutoSize = true
             };
-            card.Controls.Add(userLabel);
+            card.Controls.Add(_userLabel);
 
             _userList = new ListBox
             {
-                Location = new Point(28, 200),
                 Size = new Size(384, 148),
                 DrawMode = DrawMode.OwnerDrawFixed,
                 ItemHeight = 32,
@@ -101,18 +101,16 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _userList.SelectedIndexChanged += (sender, e) => _passwordBox.Focus();
             card.Controls.Add(_userList);
 
-            Label passwordLabel = new Label
+            _passwordLabel = new Label
             {
                 Text = "密码",
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(28, 360)
+                AutoSize = true
             };
-            card.Controls.Add(passwordLabel);
+            card.Controls.Add(_passwordLabel);
 
             _passwordBox = new TextBox
             {
-                Location = new Point(28, 384),
                 Size = new Size(384, 28),
                 Font = new Font("Microsoft YaHei UI", 10.5F),
                 UseSystemPasswordChar = true,
@@ -125,7 +123,6 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 Text = "登录",
                 Tag = "theme:accent",
-                Location = new Point(28, 432),
                 Size = new Size(184, 38),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
@@ -136,7 +133,6 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _exitButton = new Button
             {
                 Text = "退出",
-                Location = new Point(228, 432),
                 Size = new Size(184, 36),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
@@ -153,8 +149,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Text = "忘记密码 = 数据无法恢复(无后门)",
                 Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(384, 0),
-                Location = new Point(28, 484)
+                MaximumSize = new Size(384, 0)
             };
             card.Controls.Add(_hintLabel);
 
@@ -172,6 +167,44 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     _hintLabel.Text = "忘记密码 = 数据无法恢复(无后门)";
                 }
             };
+
+            LayoutCard();
+        }
+
+        /// <summary>
+        /// 按实测控件高度自上而下流动排版登录卡片。
+        /// 字体随系统 DPI 放大而坐标不缩放时（本机 150% 缩放），写死的紧凑间距会让标题压住副标题，
+        /// 改为逐行累计实测高度即可在任意缩放下不叠字；100% 缩放时各位置与原设计值一致。
+        /// Flow the login card top-down using measured control heights: with fonts scaled by DPI but
+        /// coordinates not (this machine runs 150%), hardcoded tight gaps made the title overlap the
+        /// subtitle; accumulating measured heights keeps the layout clean at any scale while staying
+        /// pixel-identical to the original design at 100%.
+        /// </summary>
+        private void LayoutCard()
+        {
+            int x = 28;
+            int y = 108;
+            _titleLabel.Location = new Point(x, y);
+            y += _titleLabel.Height + 2;
+            _subtitleLabel.Location = new Point(30, y);
+            y += _subtitleLabel.Height + 17;
+            _userLabel.Location = new Point(x, y);
+            y += _userLabel.Height + 7;
+            _userList.Location = new Point(x, y);
+            y += _userList.Height + 12;
+            _passwordLabel.Location = new Point(x, y);
+            y += _passwordLabel.Height + 7;
+            _passwordBox.Location = new Point(x, y);
+            y += Math.Max(_passwordBox.Height, _passwordBox.PreferredSize.Height) + 20;
+            _loginButton.Location = new Point(x, y);
+            _exitButton.Location = new Point(228, y);
+            y += _loginButton.Height + 14;
+            _hintLabel.Location = new Point(x, y);
+            y += _hintLabel.Height + 33;
+
+            _card.Size = new Size(440, Math.Max(560, y));
+            _clientSize = new Size(560, Math.Max(640, _card.Height + 80));
+            ClientSize = _clientSize;
         }
 
         /// <summary>
@@ -226,12 +259,12 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 句柄创建后的缩放可能改掉构造时的客户区，这里再钉一次
+        /// 句柄创建后的缩放可能改掉构造时的客户区；此时字体已按实际 DPI 定型，重排一次并钉回计算出的尺寸
         /// </summary>
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            ClientSize = new Size(560, 640);
+            LayoutCard();
             CenterCard();
         }
 

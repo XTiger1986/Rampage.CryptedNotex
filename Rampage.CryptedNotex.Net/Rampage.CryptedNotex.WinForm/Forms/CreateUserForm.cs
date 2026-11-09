@@ -17,12 +17,17 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private readonly CryptoSession _session;
 
         private Panel _card = null!;
+        private Label _titleLabel = null!;
+        private Label _welcomeLabel = null!;
         private TextBox _usernameBox = null!;
         private TextBox _displayNameBox = null!;
         private TextBox _passwordBox = null!;
         private TextBox _confirmBox = null!;
         private Button _createButton = null!;
         private Label _hintLabel = null!;
+        private Size _clientSize;
+        private readonly List<Label> _fieldLabels = new List<Label>();
+        private TextBox[] _fieldBoxes = Array.Empty<TextBox>();
 
         private bool _creating;
 
@@ -44,48 +49,45 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 构建壁纸底上的金属创建卡片
+        /// 构建壁纸底上的金属创建卡片（控件只创建，位置交给 <see cref="LayoutCard"/> 统一流动排版）
         /// </summary>
         private void BuildUi()
         {
             _card = new Panel
             {
                 Size = new Size(460, 640),
-                Location = new Point(50, 40),
                 Tag = "theme:cardEmblem"
             };
             Controls.Add(_card);
             Panel card = _card;
 
-            Label titleLabel = new Label
+            _titleLabel = new Label
             {
                 Text = NotexBrand.DisplayName,
                 Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(28, 108)
+                AutoSize = true
             };
-            card.Controls.Add(titleLabel);
+            card.Controls.Add(_titleLabel);
 
-            Label welcomeLabel = new Label
+            _welcomeLabel = new Label
             {
                 Text = "首次使用请创建账户。密码会加密全部笔记。\n忘记密码 = 数据无法恢复，没有后门。",
                 Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(404, 0),
-                Location = new Point(28, 148)
+                MaximumSize = new Size(404, 0)
             };
-            card.Controls.Add(welcomeLabel);
+            card.Controls.Add(_welcomeLabel);
 
-            AddField(card, "登录名(英文或数字,至少2个字符)", ref _usernameBox, 230, false);
-            AddField(card, "显示名(可留空)", ref _displayNameBox, 302, false);
-            AddField(card, "密码(至少6位)", ref _passwordBox, 374, true);
-            AddField(card, "确认密码", ref _confirmBox, 446, true);
+            _fieldLabels.Add(AddField(card, "登录名(英文或数字,至少2个字符)", ref _usernameBox, false));
+            _fieldLabels.Add(AddField(card, "显示名(可留空)", ref _displayNameBox, false));
+            _fieldLabels.Add(AddField(card, "密码(至少6位)", ref _passwordBox, true));
+            _fieldLabels.Add(AddField(card, "确认密码", ref _confirmBox, true));
+            _fieldBoxes = new TextBox[] { _usernameBox, _displayNameBox, _passwordBox, _confirmBox };
 
             _createButton = new Button
             {
                 Text = "创建并进入",
                 Tag = "theme:accent",
-                Location = new Point(28, 530),
                 Size = new Size(404, 38),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
@@ -98,19 +100,46 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 Text = string.Empty,
                 Tag = "theme:muted",
                 AutoSize = true,
-                MaximumSize = new Size(404, 0),
-                Location = new Point(28, 580)
+                MaximumSize = new Size(404, 0)
             };
             card.Controls.Add(_hintLabel);
 
-            _confirmBox.KeyDown += (sender, e) =>
+            _confirmBox.KeyDown += ConfirmBoxKeyDown;
+
+            LayoutCard();
+        }
+
+        /// <summary>
+        /// 按实测控件高度自上而下流动排版创建卡片（与 LoginForm 同理：字体随 DPI 放大而坐标不缩放时避免叠字）。
+        /// Flow the card top-down by measured control heights (same rationale as LoginForm: fonts scale
+        /// with DPI while coordinates do not, so hardcoded tight gaps overlap).
+        /// </summary>
+        private void LayoutCard()
+        {
+            int x = 28;
+            int y = 108;
+            _titleLabel.Location = new Point(x, y);
+            y += _titleLabel.Height + 8;
+            _welcomeLabel.Location = new Point(x, y);
+            y += _welcomeLabel.Height + 48;
+            for (int i = 0; i < _fieldBoxes.Length; i++)
             {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                    _ = AttemptCreateAsync();
-                }
-            };
+                Label fieldLabel = _fieldLabels[i];
+                TextBox box = _fieldBoxes[i];
+                fieldLabel.Location = new Point(x, y);
+                y += fieldLabel.Height + 7;
+                box.Location = new Point(x, y);
+                y += Math.Max(box.Height, box.PreferredSize.Height) + 22;
+            }
+            y += 12;
+            _createButton.Location = new Point(x, y);
+            y += _createButton.Height + 12;
+            _hintLabel.Location = new Point(x, y);
+            y += _hintLabel.Height + 43;
+
+            _card.Size = new Size(460, Math.Max(640, y));
+            _clientSize = new Size(560, Math.Max(720, _card.Height + 80));
+            ClientSize = _clientSize;
         }
 
         /// <summary>
@@ -137,37 +166,48 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         }
 
         /// <summary>
-        /// 句柄创建后的缩放可能改掉构造时的客户区，这里再钉一次
+        /// 句柄创建后的缩放可能改掉构造时的客户区；此时字体已按实际 DPI 定型，重排一次并钉回计算出的尺寸
         /// </summary>
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            ClientSize = new Size(560, 720);
+            LayoutCard();
             CenterCard();
         }
 
         /// <summary>
-        /// 添加一个标签+输入框行
+        /// 创建一个标签+输入框行（只创建控件，位置由 <see cref="LayoutCard"/> 统一流动排版）
         /// </summary>
-        private void AddField(Control parent, string label, ref TextBox box, int y, bool password)
+        private Label AddField(Panel parent, string label, ref TextBox box, bool password)
         {
             Label fieldLabel = new Label
             {
                 Text = label,
-                AutoSize = true,
-                Location = new Point(28, y)
+                AutoSize = true
             };
             parent.Controls.Add(fieldLabel);
 
             box = new TextBox
             {
-                Location = new Point(28, y + 24),
                 Size = new Size(404, 26),
                 Font = new Font("Microsoft YaHei UI", 10F),
                 UseSystemPasswordChar = password,
                 BorderStyle = BorderStyle.FixedSingle
             };
             parent.Controls.Add(box);
+            return fieldLabel;
+        }
+
+        /// <summary>
+        /// 确认密码框内回车直接创建 / Enter in the confirm box triggers creation directly
+        /// </summary>
+        private void ConfirmBoxKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                _ = AttemptCreateAsync();
+            }
         }
 
         /// <summary>
