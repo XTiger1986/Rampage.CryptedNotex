@@ -28,7 +28,8 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 ScrollBars = ScrollBars.Vertical,
                 Dock = DockStyle.Fill,
                 Font = new Font("Consolas", 12F),
-                BorderStyle = BorderStyle.None
+                BorderStyle = BorderStyle.None,
+                Tag = "theme:editor"
             };
             _textBox.TextChanged += (sender, e) =>
             {

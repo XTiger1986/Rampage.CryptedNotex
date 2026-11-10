@@ -24,7 +24,7 @@
     "link": "#66D9FF",
     "editorBack": "#000000",
     "editorText": "#FFFFFF",
-    "previewBack": "#FFFFFF"
+    "previewBack": "#0A0A0A"
   },
   "fonts": {
     "ui": { "family": "Microsoft YaHei UI", "size": 9.5 },

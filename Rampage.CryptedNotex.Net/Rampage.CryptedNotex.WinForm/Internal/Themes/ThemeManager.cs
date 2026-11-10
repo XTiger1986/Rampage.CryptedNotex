@@ -21,7 +21,8 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
     /// pinnedMark 置顶标记 / trashTint 回收站色 / warning 警示 / danger 危险 / dangerText 危险色上的文本 /
     /// success 成功 / link 链接 / editorBack 编辑器底 / editorText 编辑器文本 / previewBack 预览底。
     /// 控件 Tag 约定："theme:accent" 强调按钮、"theme:muted" 次要文本、"theme:danger" 危险按钮、
-    /// "theme:panelAlt" 列表底、"theme:editor" 编辑器底。
+    /// "theme:panelAlt" 列表底、"theme:editor" 编辑器底、"theme:tool" 工具条按钮/下拉(悬停反馈,无边框)、
+    /// "theme:toolbar" 工具条条带(面板底)、"theme:rule" 细分隔线(边框色)。
     /// </remarks>
     public static class ThemeManager
     {
@@ -196,9 +197,19 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             }
             else if (control is TextBox textBox)
             {
-                textBox.BorderStyle = BorderStyle.FixedSingle;
-                textBox.BackColor = ChromePainter.InputBackColor(textBox.Focused);
-                textBox.ForeColor = text;
+                if (tag == "theme:editor")
+                {
+                    // 编辑器表面：编辑器底/编辑器文本(纯文本/Markdown 编辑框),无边框内嵌于编辑区
+                    textBox.BorderStyle = BorderStyle.None;
+                    textBox.BackColor = GetColor("editorBack");
+                    textBox.ForeColor = GetColor("editorText");
+                }
+                else
+                {
+                    textBox.BorderStyle = BorderStyle.FixedSingle;
+                    textBox.BackColor = ChromePainter.InputBackColor(textBox.Focused);
+                    textBox.ForeColor = text;
+                }
             }
             else if (control is RichTextBox)
             {
@@ -221,12 +232,27 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                     button.ForeColor = GetColor("dangerText");
                     button.FlatAppearance.BorderColor = GetColor("danger");
                 }
+                else if (tag == "theme:tool")
+                {
+                    // 工具条按钮：透明融于工具条底色,悬停/按下用列表底/选中底反馈(富文本工具条)
+                    button.FlatAppearance.BorderSize = 0;
+                    button.BackColor = parentBack;
+                    button.ForeColor = text;
+                    button.FlatAppearance.MouseOverBackColor = panelAltBack;
+                    button.FlatAppearance.MouseDownBackColor = GetColor("selectionBack");
+                }
                 else
                 {
                     button.BackColor = panelBack;
                     button.ForeColor = text;
                     button.FlatAppearance.BorderColor = GetColor("border");
                 }
+            }
+            else if (control is ComboBox comboBox && tag == "theme:tool")
+            {
+                comboBox.FlatStyle = FlatStyle.Flat;
+                comboBox.BackColor = GetColor("inputBack");
+                comboBox.ForeColor = text;
             }
             else if (control is ListView || control is ListBox || control is TreeView)
             {
@@ -254,6 +280,17 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             {
                 control.BackColor = tag == "theme:editor" ? GetColor("editorBack") : panelAltBack;
                 control.ForeColor = text;
+            }
+            else if (tag == "theme:toolbar")
+            {
+                // 工具条条带:面板底,与内容区以分隔线区分
+                control.BackColor = panelBack;
+                control.ForeColor = text;
+            }
+            else if (tag == "theme:rule")
+            {
+                // 细分隔线(工具条分组竖线/条带底边横线)
+                control.BackColor = GetColor("border");
             }
             else
             {

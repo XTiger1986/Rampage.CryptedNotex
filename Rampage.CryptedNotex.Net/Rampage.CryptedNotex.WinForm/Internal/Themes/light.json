@@ -22,9 +22,9 @@
     "dangerText": "#FFFFFF",
     "success": "#267A54",
     "link": "#0066AA",
-    "editorBack": "#FFFFFF",
+    "editorBack": "#FAFAF6",
     "editorText": "#202226",
-    "previewBack": "#FFFFFF"
+    "previewBack": "#FAFAF6"
   },
   "fonts": {
     "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
