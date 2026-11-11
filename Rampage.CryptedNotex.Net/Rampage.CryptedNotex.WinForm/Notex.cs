@@ -71,6 +71,9 @@ namespace Rampage.CryptedNotex.WinForm
         private bool _suppressSearch;
         private Size _clientSize;
         private Task _saveQueue = Task.CompletedTask;
+        private NotifyIcon? _trayIcon;
+        private FormWindowState _stateBeforeTray = FormWindowState.Normal;
+        private bool _trayTipShown;
 
         private ContextMenuStrip _categoryMenu = null!;
         private ContextMenuStrip _noteMenu = null!;
@@ -214,7 +217,7 @@ namespace Rampage.CryptedNotex.WinForm
         }
 
         /// <summary>
-        /// 关闭前：冲写未保存内容、解除监听
+        /// 关闭前：冲写未保存内容、收掉托盘图标、解除监听
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
@@ -226,6 +229,12 @@ namespace Rampage.CryptedNotex.WinForm
 
             _closing = true;
             FlushEditorPendingSave();
+            if (_trayIcon != null)
+            {
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
+                _trayIcon = null;
+            }
             _autoLock?.Dispose();
             _categoryRowImages?.Dispose();
             _noteRowImages?.Dispose();
@@ -2701,6 +2710,114 @@ namespace Rampage.CryptedNotex.WinForm
                 ExitReason = MainExitReason.AutoLocked;
                 Close();
             }));
+        }
+
+        #endregion
+
+        #region 系统托盘
+
+        /// <summary>
+        /// 尺寸变化：进入最小化且偏好开启时隐藏到托盘；否则记录常态窗口状态供恢复使用
+        /// </summary>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (_closing)
+            {
+                return;
+            }
+
+            if (WindowState == FormWindowState.Minimized)
+            {
+                if (_userSetting.MinimizeToTray == 1)
+                {
+                    HideToTray();
+                }
+            }
+            else
+            {
+                _stateBeforeTray = WindowState;
+            }
+        }
+
+        /// <summary>
+        /// 最小化隐藏到系统托盘：图标常驻,首次给出气泡提示
+        /// </summary>
+        private void HideToTray()
+        {
+            if (!Visible)
+            {
+                // 已在托盘(隐藏引发的重复 Resize)
+                return;
+            }
+
+            FlushEditorPendingSave();
+            _trayIcon ??= BuildTrayIcon();
+            _trayIcon.Text = NotexBrand.DisplayName + " - " + (_session.User?.DisplayName ?? string.Empty);
+            _trayIcon.Visible = true;
+            if (!_trayTipShown)
+            {
+                _trayTipShown = true;
+                _trayIcon.ShowBalloonTip(2500, NotexBrand.DisplayName, "已最小化到系统托盘，双击图标恢复窗口。", ToolTipIcon.Info);
+            }
+            Hide();
+        }
+
+        /// <summary>
+        /// 从托盘恢复主窗体(还原到最小化前的常态/最大化)
+        /// </summary>
+        private void RestoreFromTray()
+        {
+            if (_closing)
+            {
+                return;
+            }
+
+            if (_trayIcon != null)
+            {
+                _trayIcon.Visible = false;
+            }
+            Show();
+            WindowState = _stateBeforeTray;
+            Activate();
+        }
+
+        /// <summary>
+        /// 构建托盘图标：双击恢复,右键菜单(显示/立即锁定/退出)
+        /// </summary>
+        private NotifyIcon BuildTrayIcon()
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Items.Add("显示" + NotexBrand.DisplayName, null, (sender, e) => RestoreFromTray());
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("立即锁定", null, (sender, e) => BeginInvoke((Action)(() =>
+            {
+                FlushEditorPendingSave();
+                ExitReason = MainExitReason.AutoLocked;
+                Close();
+            })));
+            menu.Items.Add("退出", null, (sender, e) => BeginInvoke((Action)(() =>
+            {
+                FlushEditorPendingSave();
+                ExitReason = MainExitReason.Close;
+                Close();
+            })));
+            Internal.Themes.ChromePainter.StyleMenu(menu);
+
+            NotifyIcon trayIcon = new NotifyIcon
+            {
+                Icon = Internal.Themes.ChromeAssets.AppIcon,
+                ContextMenuStrip = menu,
+                Visible = false
+            };
+            trayIcon.MouseDoubleClick += (sender, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    RestoreFromTray();
+                }
+            };
+            return trayIcon;
         }
 
         #endregion

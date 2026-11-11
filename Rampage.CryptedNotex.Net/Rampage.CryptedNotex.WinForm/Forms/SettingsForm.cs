@@ -22,6 +22,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private NumericUpDown _lockMinutesBox = null!;
         private ComboBox _fontFamilyBox = null!;
         private NumericUpDown _fontSizeBox = null!;
+        private CheckBox _minimizeTrayBox = null!;
         private TextBox _displayNameBox = null!;
         private Label _statusLabel = null!;
 
@@ -153,6 +154,16 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             };
             Controls.Add(_lockMinutesBox);
             y += RowHeight(_lockMinutesBox) + 16;
+
+            _minimizeTrayBox = new CheckBox
+            {
+                Text = "最小化到系统托盘(双击图标恢复；驻留期间空闲仍会自动锁定)",
+                AutoSize = true,
+                Location = new Point(x, y),
+                Checked = _setting.MinimizeToTray == 1
+            };
+            Controls.Add(_minimizeTrayBox);
+            y += RowHeight(_minimizeTrayBox) + 16;
 
             Label displayLabel = new Label
             {
@@ -305,6 +316,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private void Save()
         {
             _setting.AutoLockMinutes = (int)_lockMinutesBox.Value;
+            _setting.MinimizeToTray = _minimizeTrayBox.Checked ? 1 : 0;
             _setting.EditorFontFamily = (string?)_fontFamilyBox.SelectedItem ?? "Consolas";
             _setting.EditorFontSize = (double)_fontSizeBox.Value;
 

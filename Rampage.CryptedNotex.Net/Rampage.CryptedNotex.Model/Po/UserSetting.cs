@@ -47,6 +47,12 @@ namespace Rampage.CryptedNotex.Model.Po
         public double EditorFontSize { get; set; } = 12;
 
         /// <summary>
+        /// 最小化到系统托盘(0=正常最小化到任务栏;1=隐藏到托盘)；数据库默认值：1
+        /// </summary>
+        [FieldMapping(ColumnName = "minimize_to_tray")]
+        public int MinimizeToTray { get; set; } = 1;
+
+        /// <summary>
         /// 上次打开的笔记 id(0=无,登录后恢复)；数据库默认值：0
         /// </summary>
         [FieldMapping(ColumnName = "last_note_id")]
