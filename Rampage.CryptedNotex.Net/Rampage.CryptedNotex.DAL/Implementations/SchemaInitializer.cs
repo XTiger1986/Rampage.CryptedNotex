@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Rampage.AppLog;
 using Rampage.Data.Client;
 using System;
 using System.Collections.Generic;
@@ -59,7 +60,16 @@ namespace Rampage.CryptedNotex.DAL
                     string sql = ReadResourceText(resourceName);
                     using (SqliteTransaction transaction = connection.BeginTransaction())
                     {
-                        ExecuteInTransaction(connection, transaction, sql);
+                        try
+                        {
+                            ExecuteInTransaction(connection, transaction, sql);
+                        }
+                        catch (SqliteException ex) when (ex.Message.Contains("duplicate column", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // 库状态与台账脱节(手工改库/异常拷贝残留等)：新增列已存在说明变更实际已生效,
+                            // 按已应用补记台账自愈,而不是让程序每次启动都崩在这里
+                            RampageLogger.Warn("结构脚本 " + version + " 的目标列已存在，按已应用补记台账：" + ex.Message);
+                        }
                         ExecuteInTransaction(connection, transaction,
                             "INSERT INTO " + HISTORY_TABLE + " (version, applied_time) VALUES (@Version, @AppliedTime)",
                             new SqliteParameter("@Version", version), new SqliteParameter("@AppliedTime", DateTime.UtcNow));
