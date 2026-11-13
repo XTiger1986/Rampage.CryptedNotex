@@ -1,4 +1,4 @@
-using Rampage.CryptedNotex.BLL;
+﻿using Rampage.CryptedNotex.BLL;
 using Rampage.CryptedNotex.Model.Dto;
 using Rampage.CryptedNotex.WinForm.Internal;
 using Rampage.CryptedNotex.WinForm.Internal.Themes;
@@ -26,7 +26,8 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private TextBox _confirmBox = null!;
         private Button _createButton = null!;
         private Label _hintLabel = null!;
-        private Size _clientSize;
+        private AuthArtworkPanel _artwork = null!;
+        private bool _layingOut;
         private readonly List<Label> _fieldLabels = new List<Label>();
         private TextBox[] _fieldBoxes = Array.Empty<TextBox>();
 
@@ -45,30 +46,30 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 ? "首次使用请创建账户。密码会加密全部笔记。\n忘记密码 = 数据无法恢复，没有后门。"
                 : "为这台设备再添加一个账户。\n每个账户独立密码，笔记互相隔离。";
             Text = NotexBrand.DisplayName + " · 创建用户";
-            Tag = "theme:wallpaper";
-            ClientSize = new Size(560, 720);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            ClientSize = new Size(940, 700);
+            MinimumSize = new Size(560, 480);
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
             MinimizeBox = false;
             BuildUi();
         }
 
         /// <summary>
-        /// 构建壁纸底上的金属创建卡片（控件只创建，位置交给 <see cref="LayoutCard"/> 统一流动排版）
+        /// 构建主题插画与可滚动的创建账户表单。
         /// </summary>
         private void BuildUi()
         {
-            _card = new Panel
-            {
-                Size = new Size(460, 640),
-                Tag = "theme:cardEmblem"
-            };
-            Controls.Add(_card);
+            Panel shell = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            Controls.Add(shell);
+            _artwork = new AuthArtworkPanel { Dock = DockStyle.Left, Width = 360 };
+            _card = new Panel { Dock = DockStyle.Fill, Tag = "theme:card", AutoScroll = true };
+            shell.Controls.Add(_card);
+            shell.Controls.Add(_artwork);
             Panel card = _card;
 
             _titleLabel = new Label
             {
-                Text = NotexBrand.DisplayName,
+                Text = "开启你的档案",
                 Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
                 AutoSize = true
             };
@@ -111,73 +112,89 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _confirmBox.KeyDown += ConfirmBoxKeyDown;
 
+            _card.SizeChanged += (sender, e) => LayoutCard();
+            _hintLabel.TextChanged += (sender, e) => LayoutCard();
             LayoutCard();
         }
 
         /// <summary>
-        /// 按实测控件高度自上而下流动排版创建卡片（与 LoginForm 同理：字体随 DPI 放大而坐标不缩放时避免叠字）。
-        /// Flow the card top-down by measured control heights (same rationale as LoginForm: fonts scale
-        /// with DPI while coordinates do not, so hardcoded tight gaps overlap).
+        /// 按 DPI 与实测字体高度布局，避免高缩放下重叠。
         /// </summary>
         private void LayoutCard()
         {
-            int x = 28;
-            int y = 108;
-            _titleLabel.Location = new Point(x, y);
-            y += _titleLabel.Height + 8;
-            _welcomeLabel.Location = new Point(x, y);
-            y += _welcomeLabel.Height + 48;
-            for (int i = 0; i < _fieldBoxes.Length; i++)
+            if (_layingOut || _card == null || _card.ClientSize.Width < 100)
             {
-                Label fieldLabel = _fieldLabels[i];
-                TextBox box = _fieldBoxes[i];
-                fieldLabel.Location = new Point(x, y);
-                y += fieldLabel.Height + 7;
-                box.Location = new Point(x, y);
-                y += Math.Max(box.Height, box.PreferredSize.Height) + 22;
+                return;
             }
-            y += 12;
-            _createButton.Location = new Point(x, y);
-            y += _createButton.Height + 12;
-            _hintLabel.Location = new Point(x, y);
-            y += _hintLabel.Height + 43;
-
-            _card.Size = new Size(460, Math.Max(640, y));
-            _clientSize = new Size(560, Math.Max(720, _card.Height + 80));
-            ClientSize = _clientSize;
+            _layingOut = true;
+            _card.SuspendLayout();
+            try
+            {
+                // Discard the previous scroll extent before shrinking the content width.
+                _card.AutoScrollMinSize = Size.Empty;
+                _card.AutoScrollPosition = Point.Empty;
+                int x = Scale(32);
+                int width = Math.Max(Scale(220), _card.ClientSize.Width - 2 * x - SystemInformation.VerticalScrollBarWidth);
+                int y = Scale(32);
+                _titleLabel.Location = new Point(x, y);
+                y += _titleLabel.Height + Scale(12);
+                _welcomeLabel.MaximumSize = new Size(width, 0);
+                _welcomeLabel.Location = new Point(x, y);
+                y += _welcomeLabel.Height + Scale(28);
+                for (int i = 0; i < _fieldBoxes.Length; i++)
+                {
+                    Label label = _fieldLabels[i];
+                    TextBox box = _fieldBoxes[i];
+                    label.Location = new Point(x, y);
+                    y += label.Height + Scale(8);
+                    box.Location = new Point(x, y);
+                    box.Width = width;
+                    y += Math.Max(box.Height, box.PreferredSize.Height) + Scale(20);
+                }
+                y += Scale(4);
+                _createButton.SetBounds(x, y, width, Scale(42));
+                _hintLabel.MaximumSize = new Size(width, 0);
+                _hintLabel.Location = new Point(x, _createButton.Bottom + Scale(14));
+                _card.AutoScrollMinSize = new Size(0, _hintLabel.Bottom + Scale(28));
+            }
+            finally
+            {
+                _card.ResumeLayout(true);
+                _layingOut = false;
+            }
         }
 
-        /// <summary>
-        /// 卡片在壁纸上居中
-        /// </summary>
+        private int Scale(int value)
+        {
+            return (int)Math.Round(value * DeviceDpi / 96D);
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
             CenterCard();
         }
 
-        /// <summary>
-        /// 把创建卡片摆到客户区中央
-        /// </summary>
         private void CenterCard()
         {
-            if (_card == null)
+            if (_card == null || _artwork == null)
             {
                 return;
             }
-            _card.Location = new Point(
-                Math.Max(16, (ClientSize.Width - _card.Width) / 2),
-                Math.Max(16, (ClientSize.Height - _card.Height) / 2));
+            _artwork.Visible = ClientSize.Width >= Scale(780);
+            _artwork.Width = Math.Max(Scale(280), (int)(ClientSize.Width * 0.42));
+            LayoutCard();
         }
 
-        /// <summary>
-        /// 句柄创建后的缩放可能改掉构造时的客户区；此时字体已按实际 DPI 定型，重排一次并钉回计算出的尺寸
-        /// </summary>
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            LayoutCard();
+            Rectangle workArea = Screen.FromControl(this).WorkingArea;
+            Size available = new Size(Math.Max(1, workArea.Width - Scale(32)), Math.Max(1, workArea.Height - Scale(48)));
+            MinimumSize = new Size(Math.Min(MinimumSize.Width, available.Width), Math.Min(MinimumSize.Height, available.Height));
+            Size = new Size(Math.Min(Width, available.Width), Math.Min(Height, available.Height));
             CenterCard();
+            _usernameBox.Focus();
         }
 
         /// <summary>
@@ -238,6 +255,10 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _creating = true;
             _createButton.Enabled = false;
+            foreach (TextBox box in _fieldBoxes)
+            {
+                box.Enabled = false;
+            }
             _createButton.Text = "正在创建…";
             try
             {
@@ -282,6 +303,10 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 if (!IsDisposed)
                 {
                     _createButton.Enabled = true;
+                    foreach (TextBox box in _fieldBoxes)
+                    {
+                        box.Enabled = true;
+                    }
                     _createButton.Text = "创建并进入";
                 }
             }

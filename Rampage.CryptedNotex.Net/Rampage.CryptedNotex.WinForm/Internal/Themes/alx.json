@@ -1,35 +1,56 @@
 {
   "id": "alx",
   "name": "ALX",
-  "description": "拉丝银 · 公务藏蓝",
-  "darkTitleBar": false,
-  "chrome": { "metal": "silver", "wallpaper": "alx", "glow": "#60A5FA" },
+  "description": "蓝橙构成 · 建筑档案",
+  "darkTitleBar": true,
+  "appearance": {
+    "motif": "alx",
+    "styleName": "蓝橙构成 · 建筑档案",
+    "buttonShape": "square"
+  },
   "colors": {
-    "windowBack": "#E6EEF6",
-    "panelBack": "#F4F8FB",
-    "panelAltBack": "#F8FBFD",
-    "border": "#C5D2E0",
-    "inputBack": "#FFFFFF",
-    "inputBorder": "#C9D5E2",
-    "text": "#1A2740",
-    "textSecondary": "#5B6B82",
-    "accent": "#2563EB",
-    "accentText": "#FFFFFF",
-    "selectionBack": "#DBE7FF",
-    "pinnedMark": "#A16207",
-    "trashTint": "#A15A5A",
-    "warning": "#92600A",
-    "danger": "#DC2626",
-    "dangerText": "#FFFFFF",
-    "success": "#15803D",
-    "link": "#1D4ED8",
-    "editorBack": "#FAFAF6",
-    "editorText": "#1A2740",
-    "previewBack": "#FAFAF6"
+    "windowBack": "#0C203B",
+    "panelBack": "#142C4B",
+    "panelAltBack": "#10243F",
+    "sidebarBack": "#142C4B",
+    "cardBack": "#10243F",
+    "border": "#365371",
+    "inputBack": "#173250",
+    "inputBorder": "#365371",
+    "text": "#EDF4FF",
+    "textSecondary": "#ACC2DD",
+    "accent": "#FFB66E",
+    "accentText": "#271607",
+    "selectionBack": "#254565",
+    "pinnedMark": "#FFB66E",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#FFB66E",
+    "editorBack": "#F5F8FC",
+    "editorText": "#172A43",
+    "previewBack": "#F5F8FC"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#2563EB", "#0EA5E9", "#6366F1", "#0891B2", "#D97706", "#7C3AED", "#475569", "#0284C7" ]
+  "categoryPalette": [
+    "#FFB66E",
+    "#92BCEB",
+    "#B4C8DD",
+    "#C3D49A",
+    "#D7AFDA",
+    "#92CFCC",
+    "#F1C59D",
+    "#B8BBD4"
+  ]
 }

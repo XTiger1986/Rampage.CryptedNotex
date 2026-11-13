@@ -1,35 +1,56 @@
 {
   "id": "darkstar",
   "name": "暗星",
-  "description": "拉丝黑 · 警报赤辉",
+  "description": "酒红铜轨 · 深空观测",
   "darkTitleBar": true,
-  "chrome": { "metal": "black", "wallpaper": "darkstar", "glow": "#FF2A3A" },
+  "appearance": {
+    "motif": "darkstar",
+    "styleName": "酒红铜轨 · 深空观测",
+    "buttonShape": "rounded"
+  },
   "colors": {
-    "windowBack": "#10080A",
-    "panelBack": "#1A1012",
-    "panelAltBack": "#140C0E",
-    "border": "#3A2428",
-    "inputBack": "#120C0E",
-    "inputBorder": "#4A3034",
-    "text": "#F3E8EA",
-    "textSecondary": "#B08990",
-    "accent": "#E23B4A",
-    "accentText": "#1A0608",
-    "selectionBack": "#3A1218",
-    "pinnedMark": "#E0B15A",
-    "trashTint": "#E08A8A",
-    "warning": "#E0B15A",
-    "danger": "#D93A3A",
-    "dangerText": "#FFFFFF",
-    "success": "#3FC47A",
-    "link": "#FF8A8A",
-    "editorBack": "#120C0E",
-    "editorText": "#F3E8EA",
-    "previewBack": "#120C0E"
+    "windowBack": "#24191F",
+    "panelBack": "#301F28",
+    "panelAltBack": "#291B24",
+    "sidebarBack": "#301F28",
+    "cardBack": "#291B24",
+    "border": "#61404D",
+    "inputBack": "#38252E",
+    "inputBorder": "#61404D",
+    "text": "#F8EAE9",
+    "textSecondary": "#CFB1BB",
+    "accent": "#EFB39B",
+    "accentText": "#3B201A",
+    "selectionBack": "#563440",
+    "pinnedMark": "#EFB39B",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#EFB39B",
+    "editorBack": "#251A22",
+    "editorText": "#F8EAE9",
+    "previewBack": "#251A22"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#E23B4A", "#C46B2F", "#A33A5A", "#D4A017", "#8A3040", "#E07A5A", "#6A3038", "#F07070" ]
+  "categoryPalette": [
+    "#EFB39B",
+    "#D7A2BF",
+    "#B8B5DD",
+    "#D8C28C",
+    "#A9C6BF",
+    "#D7AC94",
+    "#C4B4C6",
+    "#F0C7B3"
+  ]
 }

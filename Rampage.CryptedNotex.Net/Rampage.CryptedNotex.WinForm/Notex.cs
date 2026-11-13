@@ -1,10 +1,11 @@
-using Rampage.CryptedNotex.BLL;
+﻿using Rampage.CryptedNotex.BLL;
 using Rampage.CryptedNotex.Model.Dto;
 using Rampage.CryptedNotex.Model.Enums;
 using Rampage.CryptedNotex.Model.Po;
 using Rampage.CryptedNotex.WinForm.Controls;
 using Rampage.CryptedNotex.WinForm.Forms;
 using Rampage.CryptedNotex.WinForm.Internal;
+using Rampage.CryptedNotex.WinForm.Internal.Themes;
 using Rampage.Model;
 using System;
 using System.Collections.Generic;
@@ -48,6 +49,10 @@ namespace Rampage.CryptedNotex.WinForm
         private AttachmentPanel _attachmentPanel = null!;
         private Button _trashButton = null!;
         private Label _userLabel = null!;
+        private Label _collectionLabel = null!;
+        private Label _collectionSummary = null!;
+        private Button _pinButton = null!;
+        private Button _deleteButton = null!;
         private NoteEditorBase? _activeEditor;
         private Button _editToggleButton = null!;
         private bool _editing;
@@ -124,13 +129,16 @@ namespace Rampage.CryptedNotex.WinForm
             // 默认尺寸随主屏工作区走(9/10,1180x700 为下限):高分屏上编辑器列不再被写死的尺寸挤小
             Rectangle workArea = Screen.PrimaryScreen!.WorkingArea;
             _clientSize = new Size(
-                Math.Max(1180, workArea.Width * 9 / 10),
-                Math.Max(700, workArea.Height * 9 / 10));
+                Math.Min(ScalePixel(1440), workArea.Width * 9 / 10),
+                Math.Min(ScalePixel(900), workArea.Height * 9 / 10));
             ClientSize = _clientSize;
-            MinimumSize = new Size(940, 560);
+            MinimumSize = new Size(1000, 640);
             StartPosition = FormStartPosition.CenterScreen;
             BuildUi();
             BuildMenus();
+            ClearEditor();
+            _editorMessage.Text = "让想法，从这里开始。\n\n选择一条笔记，或按 Ctrl+N 开始记录。";
+            _editorMessage.Visible = true;
         }
 
         /// <summary>
@@ -139,8 +147,18 @@ namespace Rampage.CryptedNotex.WinForm
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            Rectangle workArea = Screen.FromControl(this).WorkingArea;
+            MinimumSize = new Size(Math.Min(ScalePixel(1000), workArea.Width), Math.Min(ScalePixel(640), workArea.Height));
             ClientSize = _clientSize;
             ApplySplitDistances();
+            ApplyListMetrics();
+            FitNoteColumns();
+        }
+
+        protected override void OnDpiChanged(DpiChangedEventArgs e)
+        {
+            base.OnDpiChanged(e);
+            ApplyListMetrics();
             FitNoteColumns();
         }
 
@@ -149,17 +167,34 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void FitNoteColumns()
         {
-            if (_noteList.Columns.Count < 3 || _noteList.ClientSize.Width < 120)
+            if (_noteList == null || _noteList.Columns.Count < 3 || _noteList.ClientSize.Width < 120)
             {
                 return;
             }
 
-            _noteList.Columns[1].Width = 100;
-            _noteList.Columns[2].Width = 72;
-            int titleWidth = _noteList.ClientSize.Width - 100 - 72 - 8;
-            if (titleWidth > 80)
+            _noteList.Columns[1].Width = 0;
+            _noteList.Columns[2].Width = 0;
+            _noteList.Columns[0].Width = Math.Max(80, _noteList.ClientSize.Width - 2);
+            if (_categoryList.Columns.Count > 0)
             {
-                _noteList.Columns[0].Width = titleWidth;
+                _categoryList.Columns[0].Width = Math.Max(80, _categoryList.ClientSize.Width - 2);
+            }
+        }
+
+        private int ScalePixel(int value)
+        {
+            return (int)Math.Round(value * DeviceDpi / 96.0);
+        }
+
+        private void ApplyListMetrics()
+        {
+            if (_categoryRowImages != null)
+            {
+                _categoryRowImages.ImageSize = new Size(1, Math.Min(256, ScalePixel(46)));
+            }
+            if (_noteRowImages != null)
+            {
+                _noteRowImages.ImageSize = new Size(1, Math.Min(256, ScalePixel(88)));
             }
         }
 
@@ -170,12 +205,16 @@ namespace Rampage.CryptedNotex.WinForm
         {
             try
             {
-                int outer = Math.Min(240, Math.Max(_outerSplit.Panel1MinSize, _outerSplit.Width - _outerSplit.Panel2MinSize - _outerSplit.SplitterWidth));
+                int outer = Math.Min(ScalePixel(224), Math.Max(_outerSplit.Panel1MinSize, _outerSplit.Width - _outerSplit.Panel2MinSize - _outerSplit.SplitterWidth));
                 if (outer > _outerSplit.Panel1MinSize)
                 {
                     _outerSplit.SplitterDistance = outer;
                 }
-                int inner = Math.Min(420, Math.Max(_innerSplit.Panel1MinSize, _innerSplit.Width - _innerSplit.Panel2MinSize - _innerSplit.SplitterWidth));
+                int inner = Math.Min(ScalePixel(350), Math.Max(_innerSplit.Panel1MinSize, _innerSplit.Width - ScalePixel(400) - _innerSplit.SplitterWidth));
+                if (_innerSplit.Width > _innerSplit.Panel1MinSize + ScalePixel(400) + _innerSplit.SplitterWidth)
+                {
+                    _innerSplit.Panel2MinSize = ScalePixel(400);
+                }
                 if (inner > _innerSplit.Panel1MinSize)
                 {
                     _innerSplit.SplitterDistance = inner;
@@ -228,6 +267,9 @@ namespace Rampage.CryptedNotex.WinForm
             }
 
             _closing = true;
+            _searchTimer?.Stop();
+            _searchTimer?.Dispose();
+            _searchTimer = null;
             FlushEditorPendingSave();
             if (_trayIcon != null)
             {
@@ -251,6 +293,16 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 _searchBox.Focus();
                 _searchBox.SelectAll();
+                return true;
+            }
+            if (keyData == Keys.Escape && _searchBox.Focused && _searchBox.TextLength > 0)
+            {
+                _searchBox.Clear();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.N) && !_trashView)
+            {
+                CreateNote(ContentType.PlainText);
                 return true;
             }
             if (keyData == (Keys.Control | Keys.D1) || keyData == (Keys.Control | Keys.NumPad1))
@@ -297,7 +349,8 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 FixedPanel = FixedPanel.Panel1,
-                Panel1MinSize = 200
+                Panel1MinSize = 190,
+                SplitterWidth = 1
             };
             _outerSplit.Panel1.Tag = "theme:sidebar";
 
@@ -338,7 +391,7 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 Dock = DockStyle.Right,
                 AutoSize = true,
-                Text = "Ctrl+F 搜索",
+                Text = "Ctrl+N 新建   ·   Ctrl+F 搜索   ·   Ctrl+S 保存",
                 TextAlign = ContentAlignment.MiddleRight,
                 Tag = "theme:muted",
                 Padding = new Padding(12, 8, 0, 0)
@@ -355,7 +408,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void ApplyFramePadding()
         {
-            _frame.Padding = Internal.Themes.ChromePainter.HasWallpaper ? new Padding(10) : Padding.Empty;
+            _frame.Padding = Padding.Empty;
         }
 
         /// <summary>
@@ -368,41 +421,52 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 4,
-                Margin = new Padding(0)
+                Margin = Padding.Empty,
+                Tag = "theme:sidebar"
             };
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 206F));
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 104F));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 172F));
             panel.Controls.Add(grid);
 
-            Panel brand = new Panel
+            WorkspaceIdentity brand = new WorkspaceIdentity
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(0),
-                Tag = "theme:brand",
-                Text = NotexBrand.DisplayName
+                Margin = Padding.Empty,
+                Tag = "theme:sidebar"
             };
             grid.Controls.Add(brand, 0, 0);
 
-            FlowLayoutPanel topPanel = new FlowLayoutPanel
+            TableLayoutPanel categoryHeader = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(8, 6, 8, 4),
-                WrapContents = false,
-                Margin = new Padding(0),
-                Tag = "theme:chrome"
+                ColumnCount = 2,
+                Padding = new Padding(16, 4, 12, 4),
+                Margin = Padding.Empty,
+                Tag = "theme:sidebar"
             };
-            Button newCategoryButton = UiFactory.Button("新建分类", "theme:accent");
+            categoryHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            categoryHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84F));
+            Label heading = new Label
+            {
+                Text = "我的分类",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Tag = "theme:muted"
+            };
+            categoryHeader.Controls.Add(heading, 0, 0);
+            Button newCategoryButton = UiFactory.Button("＋ 分类");
+            newCategoryButton.Dock = DockStyle.Fill;
+            newCategoryButton.AutoSize = false;
+            newCategoryButton.Margin = Padding.Empty;
+            newCategoryButton.AccessibleName = "新建分类";
             newCategoryButton.Click += (sender, e) => CreateCategory();
-            topPanel.Controls.Add(newCategoryButton);
+            categoryHeader.Controls.Add(newCategoryButton, 1, 0);
+            grid.Controls.Add(categoryHeader, 0, 1);
 
-            _trashButton = UiFactory.Button("回收站");
-            _trashButton.Click += (sender, e) => ToggleTrashView();
-            topPanel.Controls.Add(_trashButton);
-            grid.Controls.Add(topPanel, 0, 1);
-
-            _categoryRowImages = new ImageList { ImageSize = new Size(1, 36) };
+            _categoryRowImages = new ImageList { ImageSize = new Size(1, 46) };
             _categoryList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -414,11 +478,13 @@ namespace Rampage.CryptedNotex.WinForm
                 MultiSelect = false,
                 OwnerDraw = true,
                 BorderStyle = BorderStyle.None,
-                SmallImageList = _categoryRowImages
+                SmallImageList = _categoryRowImages,
+                Margin = new Padding(10, 0, 10, 8),
+                AccessibleName = "笔记分类"
             };
             _categoryList.Columns.Add("分类", 200);
-            _categoryList.Font = new Font("Microsoft YaHei UI", 9.5F);
             UiFactory.EnableDoubleBuffer(_categoryList);
+            _categoryList.Resize += (sender, e) => FitNoteColumns();
             _categoryList.DrawItem += SuppressListItemDraw;
             _categoryList.DrawSubItem += CategoryDrawSubItem;
             _categoryList.DrawColumnHeader += (sender, e) => e.DrawDefault = true;
@@ -432,27 +498,31 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 2,
-                Padding = new Padding(8),
-                Margin = new Padding(0),
-                Tag = "theme:chrome"
+                RowCount = 3,
+                Padding = new Padding(12, 8, 12, 12),
+                Margin = Padding.Empty,
+                Tag = "theme:sidebar"
             };
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             bottomPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            bottomPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            _trashButton = UiFactory.Button("回收站    Ctrl+2");
+            _trashButton.Dock = DockStyle.Fill;
+            _trashButton.AutoSize = false;
+            _trashButton.Click += (sender, e) => ToggleTrashView();
+            bottomPanel.Controls.Add(_trashButton, 0, 0);
+            bottomPanel.SetColumnSpan(_trashButton, 2);
 
             Button settingsButton = UiFactory.Button("设置");
             settingsButton.AutoSize = false;
             settingsButton.Dock = DockStyle.Fill;
-            settingsButton.Margin = new Padding(4);
             settingsButton.Click += (sender, e) => OpenSettings();
-            bottomPanel.Controls.Add(settingsButton, 0, 0);
-
+            bottomPanel.Controls.Add(settingsButton, 0, 1);
             Button aboutButton = UiFactory.Button("关于");
             aboutButton.AutoSize = false;
             aboutButton.Dock = DockStyle.Fill;
-            aboutButton.Margin = new Padding(4);
             aboutButton.Click += (sender, e) =>
             {
                 using (AboutForm form = new AboutForm(App))
@@ -460,8 +530,7 @@ namespace Rampage.CryptedNotex.WinForm
                     form.ShowDialog(this);
                 }
             };
-            bottomPanel.Controls.Add(aboutButton, 1, 0);
-
+            bottomPanel.Controls.Add(aboutButton, 1, 1);
             _userLabel = new Label
             {
                 Text = _session.User?.DisplayName ?? string.Empty,
@@ -471,19 +540,17 @@ namespace Rampage.CryptedNotex.WinForm
                 AutoEllipsis = true,
                 Tag = "theme:muted"
             };
-            bottomPanel.Controls.Add(_userLabel, 0, 1);
-
+            bottomPanel.Controls.Add(_userLabel, 0, 2);
             Button logoutButton = UiFactory.Button("登出");
             logoutButton.AutoSize = false;
             logoutButton.Dock = DockStyle.Fill;
-            logoutButton.Margin = new Padding(4);
             logoutButton.Click += (sender, e) =>
             {
                 FlushEditorPendingSave();
                 ExitReason = MainExitReason.Logout;
                 Close();
             };
-            bottomPanel.Controls.Add(logoutButton, 1, 1);
+            bottomPanel.Controls.Add(logoutButton, 1, 2);
             grid.Controls.Add(bottomPanel, 0, 3);
         }
 
@@ -497,10 +564,12 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 FixedPanel = FixedPanel.Panel1,
-                Panel1MinSize = 260
+                Panel1MinSize = 320,
+                SplitterWidth = 1
             };
 
             BuildNoteListColumn(_innerSplit.Panel1);
+            _innerSplit.Panel2.Tag = "theme:editor";
             BuildEditorColumn(_innerSplit.Panel2);
             panel.Controls.Add(_innerSplit);
         }
@@ -514,18 +583,48 @@ namespace Rampage.CryptedNotex.WinForm
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 3
+                RowCount = 4,
+                Margin = Padding.Empty,
+                Tag = "theme:card"
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            Panel collectionHeader = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Margin = Padding.Empty,
+                Padding = new Padding(20, 16, 20, 8),
+                Tag = "theme:card"
+            };
+            _collectionSummary = new Label
+            {
+                Dock = DockStyle.Bottom,
+                Height = 22,
+                Text = "选择分类，开始记录",
+                Tag = "theme:muted"
+            };
+            _collectionLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = "我的笔记",
+                Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold),
+                AutoEllipsis = true
+            };
+            collectionHeader.Controls.Add(_collectionLabel);
+            collectionHeader.Controls.Add(_collectionSummary);
+            layout.Controls.Add(collectionHeader, 0, 0);
 
             _searchBox = new TextBox
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Microsoft YaHei UI", 10.5F),
-                Margin = new Padding(12, 10, 12, 6),
-                PlaceholderText = "搜索标题    Ctrl+F"
+                Margin = new Padding(20, 8, 20, 8),
+                PlaceholderText = "搜索所有标题    Ctrl+F",
+                AccessibleName = "搜索笔记标题"
             };
             _searchBox.TextChanged += (sender, e) =>
             {
@@ -542,34 +641,34 @@ namespace Rampage.CryptedNotex.WinForm
                 _searchTimer.Tick += SearchTimerTick;
                 _searchTimer.Start();
             };
-            layout.Controls.Add(_searchBox, 0, 0);
+            layout.Controls.Add(_searchBox, 0, 1);
 
             _normalToolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 WrapContents = false,
-                Margin = new Padding(8, 2, 8, 2),
-                Padding = new Padding(4, 4, 4, 0),
+                Margin = new Padding(14, 0, 14, 4),
+                Padding = new Padding(2, 2, 2, 0),
                 Tag = "theme:chrome"
             };
             BuildNormalToolbar(_normalToolbar);
-            layout.Controls.Add(_normalToolbar, 0, 1);
+            layout.Controls.Add(_normalToolbar, 0, 2);
 
             _trashToolbar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoSize = true,
                 WrapContents = false,
-                Margin = new Padding(8, 2, 8, 2),
-                Padding = new Padding(4, 4, 4, 0),
+                Margin = new Padding(14, 0, 14, 4),
+                Padding = new Padding(2, 2, 2, 0),
                 Visible = false,
                 Tag = "theme:chrome"
             };
             BuildTrashToolbar(_trashToolbar);
-            layout.Controls.Add(_trashToolbar, 0, 1);
+            layout.Controls.Add(_trashToolbar, 0, 2);
 
-            _noteRowImages = new ImageList { ImageSize = new Size(1, 34) };
+            _noteRowImages = new ImageList { ImageSize = new Size(1, 88) };
             _noteList = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -579,9 +678,10 @@ namespace Rampage.CryptedNotex.WinForm
                 MultiSelect = false,
                 OwnerDraw = true,
                 BorderStyle = BorderStyle.None,
-                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                HeaderStyle = ColumnHeaderStyle.None,
                 SmallImageList = _noteRowImages,
-                Margin = new Padding(8, 0, 8, 8)
+                Margin = Padding.Empty,
+                AccessibleName = "笔记列表"
             };
             _noteList.Columns.Add("标题", 160);
             _noteList.Columns.Add("修改时间", 108);
@@ -615,7 +715,7 @@ namespace Rampage.CryptedNotex.WinForm
             };
             listHost.Controls.Add(_noteList);
             listHost.Controls.Add(_emptyLabel);
-            layout.Controls.Add(listHost, 0, 2);
+            layout.Controls.Add(listHost, 0, 3);
             panel.Controls.Add(layout);
         }
 
@@ -624,7 +724,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void BuildNormalToolbar(Panel panel)
         {
-            Button newNoteButton = UiFactory.Button("新建笔记", "theme:accent");
+            Button newNoteButton = UiFactory.Button("＋ 新建笔记 ▾", "theme:accent");
             newNoteButton.Click += (sender, e) =>
             {
                 Point location = newNoteButton.PointToScreen(new Point(0, newNoteButton.Height));
@@ -632,13 +732,15 @@ namespace Rampage.CryptedNotex.WinForm
             };
             panel.Controls.Add(newNoteButton);
 
-            Button pinButton = UiFactory.Button("置顶");
-            pinButton.Click += (sender, e) => TogglePinned();
-            panel.Controls.Add(pinButton);
+            _pinButton = UiFactory.Button("置顶");
+            _pinButton.Enabled = false;
+            _pinButton.Click += (sender, e) => TogglePinned();
+            panel.Controls.Add(_pinButton);
 
-            Button trashButton = UiFactory.Button("删除");
-            trashButton.Click += (sender, e) => TrashSelectedNote();
-            panel.Controls.Add(trashButton);
+            _deleteButton = UiFactory.Button("删除");
+            _deleteButton.Enabled = false;
+            _deleteButton.Click += (sender, e) => TrashSelectedNote();
+            panel.Controls.Add(_deleteButton);
         }
 
         /// <summary>
@@ -654,7 +756,7 @@ namespace Rampage.CryptedNotex.WinForm
             purgeButton.Click += (sender, e) => PurgeSelectedNote();
             panel.Controls.Add(purgeButton);
 
-            Button emptyButton = UiFactory.Button("清空回收站");
+            Button emptyButton = UiFactory.Button("清空");
             emptyButton.Click += (sender, e) => EmptyTrash();
             panel.Controls.Add(emptyButton);
         }
@@ -670,7 +772,8 @@ namespace Rampage.CryptedNotex.WinForm
                 ColumnCount = 1,
                 RowCount = 3
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 142F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58F));
 
@@ -679,34 +782,38 @@ namespace Rampage.CryptedNotex.WinForm
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                Margin = new Padding(12, 12, 12, 0)
+                Tag = "theme:editor",
+                Margin = new Padding(28, 22, 28, 0)
             };
-            headerPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
+            headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            headerPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
             headerPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             _titleBox = new TextBox
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Microsoft YaHei UI", 13.5F),
-                BorderStyle = BorderStyle.FixedSingle,
-                PlaceholderText = "无标题(标题为明文,敏感信息请写正文)"
+                Font = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold),
+                BorderStyle = BorderStyle.None,
+                Tag = "theme:editorTitle",
+                AccessibleName = "笔记标题（明文）",
+                PlaceholderText = "笔记标题（明文）"
             };
             _titleBox.TextChanged += (sender, e) => _activeEditor?.NotifyTitleChanged();
             headerPanel.Controls.Add(_titleBox, 0, 0);
 
-            FlowLayoutPanel metaRow = new FlowLayoutPanel
+            Panel metaRow = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 4, 0, 0),
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Margin = new Padding(0)
+                Padding = new Padding(0, 4, 0, 8),
+                Tag = "theme:editor",
+                Margin = Padding.Empty
             };
             _typeLabel = new Label
             {
                 Text = string.Empty,
-                AutoSize = true,
-                Padding = new Padding(0, 6, 12, 0),
+                Dock = DockStyle.Left,
+                Width = 84,
+                TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
                 Tag = "theme:link"
             };
@@ -715,11 +822,11 @@ namespace Rampage.CryptedNotex.WinForm
             _metaLabel = new Label
             {
                 Text = "选择或新建一条笔记",
-                AutoSize = true,
-                Padding = new Padding(0, 4, 0, 0),
+                Dock = DockStyle.Fill,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
                 Tag = "theme:muted"
             };
-            metaRow.Controls.Add(_metaLabel);
 
             _editToggleButton = new Button
             {
@@ -728,10 +835,15 @@ namespace Rampage.CryptedNotex.WinForm
                 Enabled = false,
                 MinimumSize = new Size(72, 30),
                 Padding = new Padding(12, 2, 12, 2),
-                Margin = new Padding(16, 0, 0, 0),
+                Margin = Padding.Empty,
+                Dock = DockStyle.Right,
+                Width = 80,
                 Tag = "theme:accent"
             };
             _editToggleButton.Click += (sender, e) => ToggleEditMode();
+            metaRow.Controls.Clear();
+            metaRow.Controls.Add(_metaLabel);
+            metaRow.Controls.Add(_typeLabel);
             metaRow.Controls.Add(_editToggleButton);
             headerPanel.Controls.Add(metaRow, 0, 1);
             layout.Controls.Add(headerPanel, 0, 0);
@@ -739,7 +851,7 @@ namespace Rampage.CryptedNotex.WinForm
             _editorHost = new Panel
             {
                 Dock = DockStyle.Fill,
-                Margin = new Padding(12, 6, 12, 4),
+                Margin = new Padding(28, 6, 28, 12),
                 Padding = new Padding(0),
                 Tag = "theme:editor"
             };
@@ -758,7 +870,7 @@ namespace Rampage.CryptedNotex.WinForm
 
             _attachmentPanel = new AttachmentPanel
             {
-                Margin = new Padding(12, 0, 12, 8)
+                Margin = new Padding(28, 0, 28, 12)
             };
             _attachmentPanel.AddAttachmentRequested += (sender, e) => AddAttachment();
             _attachmentPanel.OpenAttachmentRequested += (sender, attachment) => OpenAttachment(attachment);
@@ -1185,6 +1297,10 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private async Task ReloadNotesAsync()
         {
+            if (_closing || IsDisposed || _session.User == null)
+            {
+                return;
+            }
             int requestId = ++_listRequestId;
             int userId = _session.User!.Id;
             bool trash = _trashView;
@@ -1254,6 +1370,10 @@ namespace Rampage.CryptedNotex.WinForm
             _noteList.Visible = !empty;
             _emptyLabel.Visible = empty;
             _emptyLabel.Text = EmptyNoteText();
+            _collectionLabel.Text = _searchKeyword.Length > 0 ? "搜索结果" : _trashView ? "回收站" : _currentCategory?.Name ?? "我的笔记";
+            _collectionSummary.Text = notes.Count + " 条笔记  ·  " + (_searchKeyword.Length > 0 ? "标题匹配" : _trashView ? "可恢复已删除的笔记" : "最近修改优先 · 置顶优先");
+            _pinButton.Enabled = false;
+            _deleteButton.Enabled = false;
             if (!empty)
             {
                 FitNoteColumns();
@@ -1415,9 +1535,16 @@ namespace Rampage.CryptedNotex.WinForm
                 textRect,
                 Internal.Themes.ThemeManager.GetColor("text"),
                 TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            using (Pen separator = new Pen(Internal.Themes.ThemeManager.GetColor("border")))
+            if (selected)
             {
-                e.Graphics.DrawLine(separator, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                using (SolidBrush accent = new SolidBrush(ThemeManager.GetColor("accent")))
+                {
+                    e.Graphics.FillRectangle(accent, e.Bounds.X, e.Bounds.Y + ScalePixel(9), ScalePixel(3), e.Bounds.Height - ScalePixel(18));
+                }
+                if (_categoryList.Focused)
+                {
+                    ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(e.Bounds, -3, -3));
+                }
             }
         }
 
@@ -1450,7 +1577,7 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private void NoteListDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
         {
-            if (e.Item == null)
+            if (e.Item == null || e.ColumnIndex != 0)
             {
                 return;
             }
@@ -1458,51 +1585,55 @@ namespace Rampage.CryptedNotex.WinForm
             Note? note = e.Item.Tag as Note;
             bool selected = e.Item.Selected;
             bool hovered = !selected && e.Item.Index == _noteHoverIndex;
-            Color back = selected
-                ? Internal.Themes.ThemeManager.GetColor("selectionBack")
-                : Internal.Themes.ThemeManager.GetColor("panelAltBack");
-            Color fore = Internal.Themes.ThemeManager.GetColor("text");
-            if (note != null && note.Status == (int)NoteStatus.Trashed)
-            {
-                fore = Internal.Themes.ThemeManager.GetColor("trashTint");
-            }
-            else if (e.ColumnIndex > 0 && !selected)
-            {
-                fore = Internal.Themes.ThemeManager.GetColor("textSecondary");
-            }
-
+            Color back = ThemeManager.GetColor(selected ? "selectionBack" : "panelAltBack");
             using (SolidBrush brush = new SolidBrush(back))
             {
                 e.Graphics.FillRectangle(brush, e.Bounds);
             }
             if (hovered)
             {
-                using (SolidBrush hoverBrush = new SolidBrush(Internal.Themes.ChromePainter.RowHoverColor()))
+                using (SolidBrush brush = new SolidBrush(ChromePainter.RowHoverColor()))
                 {
-                    e.Graphics.FillRectangle(hoverBrush, e.Bounds);
+                    e.Graphics.FillRectangle(brush, e.Bounds);
                 }
             }
-
-            Rectangle textRect = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);
-            if (e.ColumnIndex == 0 && note != null && note.IsPinned == 1)
+            int inset = ScalePixel(16);
+            int titleY = e.Bounds.Y + ScalePixel(15);
+            Color fore = ThemeManager.GetColor(note?.Status == (int)NoteStatus.Trashed ? "trashTint" : "text");
+            if (selected)
             {
-                DrawPin(e.Graphics, e.Bounds, Internal.Themes.ThemeManager.GetColor("pinnedMark"));
-                textRect.X += 16;
-                textRect.Width = Math.Max(0, textRect.Width - 16);
-            }
-            TextRenderer.DrawText(
-                e.Graphics,
-                e.SubItem?.Text ?? string.Empty,
-                _noteList.Font,
-                textRect,
-                fore,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            if (e.ColumnIndex == _noteList.Columns.Count - 1)
-            {
-                using (Pen separator = new Pen(Internal.Themes.ThemeManager.GetColor("border")))
+                using (SolidBrush accent = new SolidBrush(ThemeManager.GetColor("accent")))
                 {
-                    e.Graphics.DrawLine(separator, 0, e.Bounds.Bottom - 1, _noteList.ClientSize.Width, e.Bounds.Bottom - 1);
+                    e.Graphics.FillRectangle(accent, e.Bounds.X, e.Bounds.Y + ScalePixel(10), ScalePixel(3), e.Bounds.Height - ScalePixel(20));
                 }
+            }
+            int pinWidth = note?.IsPinned == 1 ? ScalePixel(16) : 0;
+            using (Font titleFont = new Font(_noteList.Font, FontStyle.Bold))
+            {
+                TextRenderer.DrawText(e.Graphics, e.Item.Text, titleFont,
+                    new Rectangle(e.Bounds.X + inset, titleY, Math.Max(0, e.Bounds.Width - inset * 2 - pinWidth), ScalePixel(26)),
+                    fore, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+            if (pinWidth > 0)
+            {
+                DrawPin(e.Graphics, new Rectangle(e.Bounds.Right - inset - pinWidth, titleY, pinWidth, ScalePixel(24)), ThemeManager.GetColor("pinnedMark"));
+            }
+            string type = note == null ? string.Empty : note.ContentType == (int)ContentType.Markdown ? "Markdown" : note.ContentType == (int)ContentType.RichText ? "富文本" : "纯文本";
+            string time = note == null ? string.Empty : (note.UpdateTime ?? note.CreateTime).ToLocalTime().ToString("MM-dd HH:mm");
+            string detail = type + "  ·  " + time + "  ·  " + (note?.WordCount ?? 0) + " 字";
+            using (Font detailFont = new Font(_noteList.Font.FontFamily, 8.5F))
+            {
+                TextRenderer.DrawText(e.Graphics, detail, detailFont,
+                    new Rectangle(e.Bounds.X + inset, e.Bounds.Y + ScalePixel(48), Math.Max(0, e.Bounds.Width - inset * 2), ScalePixel(22)),
+                    ThemeManager.GetColor("textSecondary"), TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+            using (Pen separator = new Pen(ThemeManager.GetColor("border")))
+            {
+                e.Graphics.DrawLine(separator, e.Bounds.X + inset, e.Bounds.Bottom - 1, e.Bounds.Right - inset, e.Bounds.Bottom - 1);
+            }
+            if (selected && _noteList.Focused)
+            {
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(e.Bounds, -3, -3), fore, back);
             }
         }
 
@@ -1558,6 +1689,10 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private async void SearchTimerTick(object? sender, EventArgs e)
         {
+            if (_closing || IsDisposed)
+            {
+                return;
+            }
             _searchTimer?.Stop();
             _searchKeyword = _searchBox.Text.Trim();
             if (_trashView && _searchKeyword.Length > 0)
@@ -1638,6 +1773,9 @@ namespace Rampage.CryptedNotex.WinForm
         /// </summary>
         private async void OnNoteSelected(object? sender, EventArgs e)
         {
+            _pinButton.Enabled = _noteList.SelectedItems.Count > 0 && !_trashView;
+            _deleteButton.Enabled = _noteList.SelectedItems.Count > 0 && !_trashView;
+
             if (_closing)
             {
                 return;
@@ -2361,6 +2499,7 @@ namespace Rampage.CryptedNotex.WinForm
                 pair.Value.Visible = ReferenceEquals(pair.Value, editor);
             }
             _activeEditor = editor;
+            Internal.Themes.ThemeManager.Apply(editor);
             return editor;
         }
 
@@ -2684,6 +2823,8 @@ namespace Rampage.CryptedNotex.WinForm
             }
             _autoLock?.UpdateSettings(_userSetting.AutoLockMinutes);
             ApplyEditorFonts();
+            _userLabel.Text = _session.User?.DisplayName ?? string.Empty;
+            Text = NotexBrand.DisplayName + " - " + _userLabel.Text;
         }
 
         /// <summary>

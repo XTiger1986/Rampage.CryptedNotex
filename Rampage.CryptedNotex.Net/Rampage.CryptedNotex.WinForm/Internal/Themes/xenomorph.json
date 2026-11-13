@@ -1,35 +1,56 @@
 {
   "id": "xenomorph",
   "name": "异形",
-  "description": "拉丝黑 · 深空青辉",
+  "description": "酸绿脊线 · 生物机械",
   "darkTitleBar": true,
-  "chrome": { "metal": "black", "wallpaper": "xenomorph", "glow": "#3EC6FF" },
+  "appearance": {
+    "motif": "xenomorph",
+    "styleName": "酸绿脊线 · 生物机械",
+    "buttonShape": "cut"
+  },
   "colors": {
-    "windowBack": "#071018",
-    "panelBack": "#121A24",
-    "panelAltBack": "#0C141E",
-    "border": "#2A3C52",
-    "inputBack": "#0E1622",
-    "inputBorder": "#314558",
-    "text": "#E6EEF8",
-    "textSecondary": "#8AA0B8",
-    "accent": "#3EC6FF",
-    "accentText": "#041018",
-    "selectionBack": "#123044",
-    "pinnedMark": "#E6C36A",
-    "trashTint": "#E09A9A",
-    "warning": "#E0B15A",
-    "danger": "#D03A3A",
-    "dangerText": "#FFFFFF",
-    "success": "#34D399",
-    "link": "#7FD4FF",
-    "editorBack": "#0B121C",
-    "editorText": "#E6EEF8",
-    "previewBack": "#0B121C"
+    "windowBack": "#101710",
+    "panelBack": "#192319",
+    "panelAltBack": "#141D14",
+    "sidebarBack": "#192319",
+    "cardBack": "#141D14",
+    "border": "#3B5133",
+    "inputBack": "#1D291B",
+    "inputBorder": "#3B5133",
+    "text": "#EFF7E8",
+    "textSecondary": "#B4C6A8",
+    "accent": "#B6F36A",
+    "accentText": "#18230D",
+    "selectionBack": "#334C25",
+    "pinnedMark": "#B6F36A",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#B6F36A",
+    "editorBack": "#111A12",
+    "editorText": "#EFF7E8",
+    "previewBack": "#111A12"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#3EC6FF", "#7AA2FF", "#3DDC97", "#E6C36A", "#A78BFA", "#5EEAD4", "#94A3B8", "#38BDF8" ]
+  "categoryPalette": [
+    "#B6F36A",
+    "#DCC58B",
+    "#82C8A0",
+    "#ADC7D0",
+    "#C6B0D2",
+    "#DFB096",
+    "#A6BE78",
+    "#B9CBAE"
+  ]
 }

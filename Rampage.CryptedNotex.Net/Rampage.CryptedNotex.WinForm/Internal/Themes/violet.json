@@ -1,34 +1,56 @@
 {
   "id": "violet",
   "name": "紫罗兰",
-  "description": "低光紫调 · 夜间记录",
+  "description": "暮紫月弧 · 夜间灵感",
   "darkTitleBar": true,
+  "appearance": {
+    "motif": "violet",
+    "styleName": "暮紫月弧 · 夜间灵感",
+    "buttonShape": "rounded"
+  },
   "colors": {
-    "windowBack": "#211B2E",
-    "panelBack": "#2A2239",
-    "panelAltBack": "#312845",
-    "border": "#44375C",
-    "inputBack": "#372C4E",
-    "inputBorder": "#4A3D66",
-    "text": "#EDE8F7",
-    "textSecondary": "#A79CC4",
-    "accent": "#8C6FD4",
-    "accentText": "#17111F",
-    "selectionBack": "#4A3A73",
-    "pinnedMark": "#E0B84C",
-    "trashTint": "#CFA3AC",
-    "warning": "#D7BA7D",
-    "danger": "#C94646",
-    "dangerText": "#FFFFFF",
-    "success": "#7BC896",
-    "link": "#B49AE8",
-    "editorBack": "#211B2E",
-    "editorText": "#DCD5EE",
-    "previewBack": "#211B2E"
+    "windowBack": "#231C31",
+    "panelBack": "#2D233E",
+    "panelAltBack": "#271E37",
+    "sidebarBack": "#2D233E",
+    "cardBack": "#271E37",
+    "border": "#514263",
+    "inputBack": "#302642",
+    "inputBorder": "#514263",
+    "text": "#F3EAFB",
+    "textSecondary": "#C1AED2",
+    "accent": "#D6B7F5",
+    "accentText": "#30203D",
+    "selectionBack": "#4B355E",
+    "pinnedMark": "#D6B7F5",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#D6B7F5",
+    "editorBack": "#241C32",
+    "editorText": "#F3EAFB",
+    "previewBack": "#241C32"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#8C6FD4", "#C86FB0", "#6F8CD4", "#B96FC8", "#6FC8B9", "#D4A46F", "#966FD4", "#6FD496" ]
+  "categoryPalette": [
+    "#D6B7F5",
+    "#F3B8D0",
+    "#ADC5EC",
+    "#D9C39D",
+    "#B4D6C7",
+    "#C6BCF0",
+    "#D4B3BC",
+    "#B5BED7"
+  ]
 }

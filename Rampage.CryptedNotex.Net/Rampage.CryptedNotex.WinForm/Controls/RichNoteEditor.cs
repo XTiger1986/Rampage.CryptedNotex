@@ -12,13 +12,14 @@ namespace Rampage.CryptedNotex.WinForm.Controls
     /// </summary>
     /// <remarks>
     /// 工具条按钮 Tag=theme:tool(悬停/按下反馈,无边框),条带 Tag=theme:toolbar,分组竖线 Tag=theme:rule;
-    /// 正文面 Tag=theme:editor(编辑器底/文本随主题)。加载与主题切换时做对比度自适应:
-    /// 全文单色且与底色明暗相同时(如浅色主题下写的旧笔记拿到深色主题),整体重着色为当前主题文本色。
+    /// 正文面 Tag=theme:document，保留原始 RTF 的文字颜色，按文档文字选择稳定的明暗纸张。
+    /// 主题仅影响工具条和周边界面；未编辑正文时原样交还加载的字符串，避免查看、改标题或换主题改写历史文档。
     /// </remarks>
     public class RichNoteEditor : NoteEditorBase
     {
         private readonly Panel _toolbar;
         private readonly RichTextBox _richTextBox;
+        private readonly Panel _documentSurface;
         private readonly Button _boldButton;
         private readonly Button _italicButton;
         private readonly Button _underlineButton;
@@ -28,6 +29,9 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         private readonly ComboBox _fontSizeBox;
         private readonly ToolTip _toolTips;
         private bool _updatingToolbar;
+        private bool _loadingDocument;
+        private bool _documentChanged;
+        private string _loadedContent = string.Empty;
 
         /// <summary>
         /// 构造富文本编辑器
@@ -48,7 +52,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             _toolbar = new Panel
             {
                 Dock = DockStyle.Fill,
-                Height = 42,
+                Height = 46,
                 Tag = "theme:toolbar",
                 Margin = new Padding(0)
             };
@@ -59,7 +63,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
                 AutoSize = true,
-                Padding = new Padding(8, 7, 8, 6)
+                Padding = new Padding(12, 9, 12, 8)
             };
             _boldButton = BuildStyleButton("B", FontStyle.Bold, "加粗 (Ctrl+B)");
             _italicButton = BuildStyleButton("I", FontStyle.Italic, "斜体 (Ctrl+I)");
@@ -89,11 +93,12 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Margin = new Padding(0)
             });
 
-            Panel surface = new Panel
+            _documentSurface = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(14, 10, 14, 12),
-                Tag = "theme:editor",
+                Padding = new Padding(24, 20, 24, 24),
+                BackColor = Color.White,
+                Tag = "theme:document",
                 Margin = new Padding(0)
             };
             _richTextBox = new RichTextBox
@@ -101,13 +106,16 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Microsoft YaHei UI", 11F),
-                AcceptsTab = true
+                AcceptsTab = true,
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(32, 34, 38),
+                Tag = "theme:document"
             };
             _richTextBox.TextChanged += (sender, e) =>
             {
-                if (!IsReadOnly)
+                if (!_loadingDocument && !IsReadOnly)
                 {
-                    MarkDirty();
+                    MarkDocumentDirty();
                 }
             };
             _richTextBox.KeyDown += EditorKeyDown;
@@ -121,7 +129,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                     return;
                 }
                 _richTextBox.SelectionBullet = !_richTextBox.SelectionBullet;
-                MarkDirty();
+                MarkDocumentDirty();
                 UpdateToolbarState();
             };
             _colorButton.Click += (sender, e) =>
@@ -135,15 +143,15 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                     if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
                     {
                         _richTextBox.SelectionColor = dialog.Color;
-                        MarkDirty();
+                        MarkDocumentDirty();
                         UpdateToolbarState();
                     }
                 }
             };
-            surface.Controls.Add(_richTextBox);
+            _documentSurface.Controls.Add(_richTextBox);
 
             layout.Controls.Add(_toolbar, 0, 0);
-            layout.Controls.Add(surface, 0, 1);
+            layout.Controls.Add(_documentSurface, 0, 1);
             Controls.Add(layout);
 
             ThemeManager.CurrentChanged += OnThemeChanged;
@@ -153,18 +161,28 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public override void LoadNote(NoteDetailDto dto)
         {
             Current = dto;
+            _loadedContent = dto.PlainContent;
+            _loadingDocument = true;
             try
             {
-                _richTextBox.Rtf = dto.PlainContent;
+                try
+                {
+                    _richTextBox.Rtf = dto.PlainContent;
+                }
+                catch (ArgumentException)
+                {
+                    // 历史/异常数据不是合法 RTF 时退回纯文本展示；未编辑时仍保留原始内容。
+                    _richTextBox.Text = dto.PlainContent;
+                }
+                ApplyDocumentCanvas();
             }
-            catch (ArgumentException)
+            finally
             {
-                // 历史/异常数据不是合法 RTF 时退回纯文本展示
-                _richTextBox.Text = dto.PlainContent;
+                _loadingDocument = false;
             }
-            NormalizeContentColor();
+            _documentChanged = false;
             UpdateToolbarState();
-            IsDirty = false;
+            MarkSaved();
         }
 
         /// <inheritdoc />
@@ -178,8 +196,8 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// <inheritdoc />
         public override string CollectContent()
         {
-            // RTF 类型以 RTF 文档为存储格式
-            return _richTextBox.Rtf ?? string.Empty;
+            // RichEdit 会规范化 RTF；仅在用户实际修改正文/格式后接受该序列化结果。
+            return _documentChanged ? _richTextBox.Rtf ?? string.Empty : _loadedContent;
         }
 
         /// <inheritdoc />
@@ -300,7 +318,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             FontStyle current = _richTextBox.SelectionFont.Style;
             FontStyle target = (current & style) == style ? current & ~style : current | style;
             _richTextBox.SelectionFont = new Font(_richTextBox.SelectionFont, target);
-            MarkDirty();
+            MarkDocumentDirty();
             UpdateToolbarState();
         }
 
@@ -331,7 +349,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 if (_richTextBox.SelectionFont != null && comboBox.SelectedItem is float size)
                 {
                     _richTextBox.SelectionFont = new Font(_richTextBox.SelectionFont.FontFamily, size, _richTextBox.SelectionFont.Style);
-                    MarkDirty();
+                    MarkDocumentDirty();
                 }
             };
             _toolTips.SetToolTip(comboBox, "字号");
@@ -343,7 +361,7 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// </summary>
         private void UpdateToolbarState()
         {
-            if (_updatingToolbar)
+            if (_updatingToolbar || _loadingDocument)
             {
                 return;
             }
@@ -396,48 +414,46 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// </summary>
         private static void SetToggle(Button button, bool active)
         {
-            button.BackColor = active ? ThemeManager.GetColor("selectionBack") : ThemeManager.GetColor("panelBack");
+            ChromePainter.SetButtonActive(button, active);
             button.ForeColor = ThemeManager.GetColor("text");
         }
 
         /// <summary>
-        /// 正文颜色随主题：空文档把插入色设为主题文本色；全文单色且与底色明暗相同时整体重着色
-        /// (旧笔记在不同明暗主题间迁移时的可读性保护)
+        /// 用户修改正文或格式后，才允许重新序列化 RTF 并启动自动保存。
         /// </summary>
-        private void NormalizeContentColor()
+        private void MarkDocumentDirty()
         {
-            Color back = ThemeManager.GetColor("editorBack");
-            Color fore = ThemeManager.GetColor("editorText");
-            _richTextBox.BackColor = back;
-            _richTextBox.ForeColor = fore;
-
-            if (_richTextBox.TextLength == 0)
-            {
-                _richTextBox.SelectionStart = 0;
-                _richTextBox.SelectionLength = 0;
-                _richTextBox.SelectionColor = fore;
-                return;
-            }
-
-            int selectionStart = _richTextBox.SelectionStart;
-            int selectionLength = _richTextBox.SelectionLength;
-            _richTextBox.SelectAll();
-            Color uniform = _richTextBox.SelectionColor;
-            if (uniform != Color.Empty && !uniform.IsSystemColor && uniform.ToArgb() != fore.ToArgb())
-            {
-                bool textDark = uniform.GetBrightness() < 0.5f;
-                bool backDark = back.GetBrightness() < 0.5f;
-                if (textDark == backDark)
-                {
-                    // 全文单色且在当前底色上不可读：重着色为主题文本色
-                    _richTextBox.SelectionColor = fore;
-                }
-            }
-            _richTextBox.Select(selectionStart, selectionLength);
+            _documentChanged = true;
+            MarkDirty();
         }
 
         /// <summary>
-        /// 主题切换：延后到整棵控件树重刷之后再校正正文颜色与工具条状态
+        /// 按文档现有文字选择纸张明暗，兼容历史深色主题写入的浅色 RTF。
+        /// 仅改变控件背景，绝不改动选中文字的颜色、字体、正文或持久化格式。
+        /// </summary>
+        private void ApplyDocumentCanvas()
+        {
+            int start = _richTextBox.SelectionStart;
+            int length = _richTextBox.SelectionLength;
+            double lightInk = 0;
+            int samples = Math.Min(_richTextBox.TextLength, 128);
+            for (int sample = 0; sample < samples; sample++)
+            {
+                int position = (int)((long)sample * _richTextBox.TextLength / samples);
+                _richTextBox.Select(position, 1);
+                Color color = _richTextBox.SelectionColor;
+                lightInk += color.GetBrightness();
+            }
+            Color paper = samples > 0 && lightInk / samples > 0.55
+                ? Color.FromArgb(30, 34, 41)
+                : Color.White;
+            _documentSurface.BackColor = paper;
+            _richTextBox.BackColor = paper;
+            _richTextBox.Select(start, length);
+        }
+
+        /// <summary>
+        /// 主题只刷新工具条状态，绝不设置正文前景色或选区格式。
         /// </summary>
         private void OnThemeChanged(Theme theme)
         {
@@ -445,13 +461,14 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             {
                 BeginInvoke(new Action(() =>
                 {
-                    NormalizeContentColor();
-                    UpdateToolbarState();
+                    if (!IsDisposed)
+                    {
+                        UpdateToolbarState();
+                    }
                 }));
             }
             else
             {
-                NormalizeContentColor();
                 UpdateToolbarState();
             }
         }

@@ -1,35 +1,56 @@
 {
   "id": "invader",
   "name": "入侵者",
-  "description": "拉丝银 · 侦察青绿",
+  "description": "冰青坐标 · 侦察雷达",
   "darkTitleBar": false,
-  "chrome": { "metal": "silver", "wallpaper": "invader", "glow": "#14D0EA" },
+  "appearance": {
+    "motif": "invader",
+    "styleName": "冰青坐标 · 侦察雷达",
+    "buttonShape": "cut"
+  },
   "colors": {
-    "windowBack": "#D5DCE4",
-    "panelBack": "#E7EDF2",
-    "panelAltBack": "#F7F9FB",
-    "border": "#B4BEC8",
+    "windowBack": "#E6F2EF",
+    "panelBack": "#D8EAE5",
+    "panelAltBack": "#F2F9F6",
+    "sidebarBack": "#D8EAE5",
+    "cardBack": "#F2F9F6",
+    "border": "#A3C4BB",
     "inputBack": "#FFFFFF",
-    "inputBorder": "#C5CED6",
-    "text": "#1B2430",
-    "textSecondary": "#51606F",
-    "accent": "#067A92",
+    "inputBorder": "#A3C4BB",
+    "text": "#153D33",
+    "textSecondary": "#3B5F51",
+    "accent": "#006A5B",
     "accentText": "#FFFFFF",
-    "selectionBack": "#D5F4FA",
-    "pinnedMark": "#A07800",
-    "trashTint": "#A15A5A",
-    "warning": "#8A6416",
-    "danger": "#C62828",
+    "selectionBack": "#BADBCF",
+    "pinnedMark": "#006A5B",
+    "trashTint": "#8C4544",
+    "warning": "#805626",
+    "danger": "#B13338",
     "dangerText": "#FFFFFF",
-    "success": "#08795C",
-    "link": "#04607A",
-    "editorBack": "#FAFAF6",
-    "editorText": "#1B2430",
-    "previewBack": "#FAFAF6"
+    "success": "#286744",
+    "link": "#006A5B",
+    "editorBack": "#F4FAF6",
+    "editorText": "#153D33",
+    "previewBack": "#F4FAF6"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#067A92", "#3D7EA6", "#C4A35A", "#5C6B7A", "#1A8A7A", "#8A5A7A", "#4A6FA5", "#B06A3A" ]
+  "categoryPalette": [
+    "#006A5B",
+    "#255F82",
+    "#847019",
+    "#805C87",
+    "#237B7A",
+    "#8C5642",
+    "#396A4A",
+    "#526A74"
+  ]
 }

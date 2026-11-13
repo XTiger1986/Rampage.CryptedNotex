@@ -187,7 +187,11 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             Color panelAltBack = GetColor("panelAltBack");
             string? tag = control.Tag as string;
 
-            if (control is Form form)
+            if (tag == "theme:document")
+            {
+                // RTF 是用户文档，纸张和文字颜色由编辑器负责，不能被主题重写。
+            }
+            else if (control is Form form)
             {
                 form.BackColor = GetColor("windowBack");
                 form.ForeColor = text;
@@ -197,7 +201,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             }
             else if (control is TextBox textBox)
             {
-                if (tag == "theme:editor")
+                if (tag == "theme:editor" || tag == "theme:editorTitle")
                 {
                     // 编辑器表面：编辑器底/编辑器文本(纯文本/Markdown 编辑框),无边框内嵌于编辑区
                     textBox.BorderStyle = BorderStyle.None;
@@ -248,11 +252,17 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                     button.FlatAppearance.BorderColor = GetColor("border");
                 }
             }
-            else if (control is ComboBox comboBox && tag == "theme:tool")
+            else if (control is ComboBox comboBox)
             {
                 comboBox.FlatStyle = FlatStyle.Flat;
                 comboBox.BackColor = GetColor("inputBack");
                 comboBox.ForeColor = text;
+            }
+            else if (control is NumericUpDown numberBox)
+            {
+                numberBox.BackColor = GetColor("inputBack");
+                numberBox.ForeColor = text;
+                numberBox.BorderStyle = BorderStyle.FixedSingle;
             }
             else if (control is ListView || control is ListBox || control is TreeView)
             {
@@ -264,7 +274,22 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             else if (control is Label || control is LinkLabel)
             {
                 control.BackColor = ChromePainter.HostsMetal(control.Parent) ? Color.Transparent : parentBack;
-                control.ForeColor = tag == "theme:muted" ? GetColor("textSecondary") : (tag == "theme:link" ? GetColor("link") : text);
+                bool editorSurface = IsEditorSurface(control.Parent);
+                Color labelText = editorSurface ? GetColor("editorText") : text;
+                Color muted = editorSurface ? Blend(GetColor("editorBack"), labelText, 0.72F) : GetColor("textSecondary");
+                Color link = GetColor("link");
+                if (editorSurface && ContrastRatio(link, GetColor("editorBack")) < 4.5)
+                {
+                    link = labelText;
+                }
+                control.ForeColor = tag == "theme:muted" ? muted : (tag == "theme:link" ? link : labelText);
+                if (control is LinkLabel linkLabel)
+                {
+                    linkLabel.LinkColor = link;
+                    linkLabel.ActiveLinkColor = link;
+                    linkLabel.VisitedLinkColor = link;
+                    linkLabel.DisabledLinkColor = GetColor("textSecondary");
+                }
             }
             else if (control is PictureBox picture && tag == "theme:emblem")
             {
@@ -276,12 +301,23 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             {
                 // 图片与进度条保持控件默认渲染
             }
-            else if (tag == "theme:panelAlt" || tag == "theme:editor")
+            else if (tag == "theme:sidebar" || tag == "theme:brand")
             {
-                control.BackColor = tag == "theme:editor" ? GetColor("editorBack") : panelAltBack;
+                control.BackColor = Current.Colors.ContainsKey("sidebarBack") ? GetColor("sidebarBack") : panelBack;
                 control.ForeColor = text;
             }
-            else if (tag == "theme:toolbar")
+            else if (tag == "theme:card" || tag == "theme:cardEmblem")
+            {
+                control.BackColor = Current.Colors.ContainsKey("cardBack") ? GetColor("cardBack") : panelAltBack;
+                control.ForeColor = text;
+            }
+            else if (tag == "theme:panelAlt" || tag == "theme:editor" || tag == "theme:editorTitle")
+            {
+                bool editor = tag != "theme:panelAlt";
+                control.BackColor = editor ? GetColor("editorBack") : panelAltBack;
+                control.ForeColor = editor ? GetColor("editorText") : text;
+            }
+            else if (tag == "theme:toolbar" || tag == "theme:chrome" || tag == "theme:hero")
             {
                 // 工具条条带:面板底,与内容区以分隔线区分
                 control.BackColor = panelBack;
@@ -303,6 +339,45 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 Color childParentBack = control is Form ? GetColor("windowBack") : control.BackColor;
                 ApplyCore(child, childParentBack);
             }
+        }
+
+        private static bool IsEditorSurface(Control? parent)
+        {
+            while (parent != null)
+            {
+                string? tag = parent.Tag as string;
+                if (tag == "theme:editor" || tag == "theme:editorTitle")
+                {
+                    return true;
+                }
+                parent = parent.Parent;
+            }
+            return false;
+        }
+
+        private static Color Blend(Color back, Color fore, float amount)
+        {
+            return Color.FromArgb(
+                (int)(back.R + (fore.R - back.R) * amount),
+                (int)(back.G + (fore.G - back.G) * amount),
+                (int)(back.B + (fore.B - back.B) * amount));
+        }
+
+        private static double ContrastRatio(Color first, Color second)
+        {
+            double left = RelativeLuminance(first);
+            double right = RelativeLuminance(second);
+            return (Math.Max(left, right) + 0.05) / (Math.Min(left, right) + 0.05);
+        }
+
+        private static double RelativeLuminance(Color color)
+        {
+            static double Linear(byte channel)
+            {
+                double value = channel / 255.0;
+                return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+            return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
         }
 
         /// <summary>

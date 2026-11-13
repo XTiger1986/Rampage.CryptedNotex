@@ -1,5 +1,6 @@
-using Rampage.CryptedNotex.Common;
+﻿using Rampage.CryptedNotex.Common;
 using Rampage.CryptedNotex.WinForm.Internal;
+using Rampage.CryptedNotex.WinForm.Internal.Themes;
 using System;
 using System.Drawing;
 using System.Security.Cryptography;
@@ -13,7 +14,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
     /// </summary>
     public class AboutForm : NotexFormBase
     {
-        private PictureBox _emblem = null!;
+        private Panel _emblem = null!;
         private Label _titleLabel = null!;
         private Label _techLabel = null!;
         private Label _infoLabel = null!;
@@ -41,11 +42,12 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void BuildUi()
         {
-            _emblem = new PictureBox
+            _emblem = new Panel
             {
-                Tag = "theme:emblem",
+                Tag = "theme:card",
                 Size = new Size(64, 64)
             };
+            _emblem.Paint += (sender, e) => ThemeArtwork.Draw(e.Graphics, _emblem.ClientRectangle, ThemeManager.Current);
             Controls.Add(_emblem);
 
             _titleLabel = new Label
@@ -104,21 +106,32 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void LayoutCard()
         {
-            int x = 20;
-            int textX = x + 80;
-            _emblem.Location = new Point(x, 20);
-            _titleLabel.Location = new Point(textX, 20);
-            _techLabel.Location = new Point(textX + 2, _titleLabel.Bottom + 4);
-            int headerBottom = Math.Max(_emblem.Bottom, _techLabel.Bottom) + 20;
+            int x = Scale(24);
+            int textX = x + Scale(84);
+            _emblem.Size = new Size(Scale(64), Scale(64));
+            _emblem.Location = new Point(x, Scale(24));
+            _titleLabel.Location = new Point(textX, Scale(24));
+            _techLabel.Location = new Point(textX + 2, _titleLabel.Bottom + Scale(4));
+            int headerBottom = Math.Max(_emblem.Bottom, _techLabel.Bottom) + Scale(24);
 
+            _infoLabel.MaximumSize = new Size(Scale(472), 0);
+            _resultLabel.MaximumSize = new Size(Scale(472), 0);
+            _selfTestButton.Size = new Size(Scale(160), Scale(38));
             _infoLabel.Location = new Point(x, headerBottom);
-            int y = _infoLabel.Bottom + 18;
+            int y = _infoLabel.Bottom + Scale(18);
             _selfTestButton.Location = new Point(x, y);
-            y += _selfTestButton.Height + 12;
+            y += _selfTestButton.Height + Scale(12);
             _resultLabel.Location = new Point(x, y);
 
-            _clientSize = new Size(460, Math.Max(360, _resultLabel.Bottom + 28));
-            ClientSize = _clientSize;
+            _clientSize = new Size(Scale(520), Math.Max(Scale(360), _resultLabel.Bottom + Scale(28)));
+            Rectangle work = Screen.FromControl(this).WorkingArea;
+            ClientSize = new Size(Math.Min(_clientSize.Width, work.Width - Scale(32)), Math.Min(_clientSize.Height, work.Height - Scale(72)));
+            AutoScroll = true;
+        }
+
+        private int Scale(int value)
+        {
+            return (int)Math.Round(value * DeviceDpi / 96D);
         }
 
         /// <summary>

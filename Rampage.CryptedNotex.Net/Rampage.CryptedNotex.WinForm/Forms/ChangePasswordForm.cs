@@ -1,4 +1,4 @@
-using Rampage.CryptedNotex.BLL;
+﻿using Rampage.CryptedNotex.BLL;
 using Rampage.CryptedNotex.WinForm.Internal;
 using Rampage.Model;
 using System;
@@ -22,6 +22,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private Button _okButton = null!;
         private ProgressBar _progressBar = null!;
         private Label _statusLabel = null!;
+        private bool _changing;
 
         /// <summary>
         /// 构造改密窗体
@@ -46,82 +47,39 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private void BuildUi()
         {
-            int y = 18;
-            string introText = "修改登录密码会用新密钥重新加密全部笔记和附件。完成前请不要关闭窗口。";
-            Size introSize = TextRenderer.MeasureText(
-                introText,
-                Font,
-                new Size(380, 0),
-                TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
-            Label intro = new Label
-            {
-                Text = introText,
-                Tag = "theme:muted",
-                AutoSize = false,
-                Location = new Point(20, y),
-                Size = new Size(380, introSize.Height)
-            };
-            Controls.Add(intro);
-            y = intro.Bottom + 16;
-
-            y = AddPasswordField("旧密码", ref _oldBox, y);
-            y = AddPasswordField("新密码(至少6位)", ref _newBox, y);
-            y = AddPasswordField("确认新密码", ref _confirmBox, y);
-
-            _okButton = new Button
-            {
-                Text = "开始修改",
-                Tag = "theme:accent",
-                Location = new Point(20, y + 8),
-                Size = new Size(380, 36)
-            };
+            ClientSize = new Size(500, 500);
+            DialogBody body = new DialogBody();
+            Controls.Add(body);
+            body.AddHeading("更新档案密码");
+            body.AddHelp("笔记和附件会使用新密钥重新加密。请牢记新密码，并等待操作完成。");
+            _oldBox = new TextBox { Font = new Font("Microsoft YaHei UI", 10.5F), UseSystemPasswordChar = true };
+            _newBox = new TextBox { Font = new Font("Microsoft YaHei UI", 10.5F), UseSystemPasswordChar = true };
+            _confirmBox = new TextBox { Font = new Font("Microsoft YaHei UI", 10.5F), UseSystemPasswordChar = true };
+            body.AddField("当前密码", _oldBox);
+            body.AddField("新密码（至少 6 位）", _newBox);
+            body.AddField("确认新密码", _confirmBox);
+            _okButton = UiFactory.Button("更新密码", "theme:accent");
+            _okButton.Dock = DockStyle.Top;
+            _okButton.Margin = new Padding(0, 0, 0, 16);
             _okButton.Click += async (sender, e) => await AttemptChangeAsync();
-            Controls.Add(_okButton);
+            body.Add(_okButton);
             AcceptButton = _okButton;
-
-            _progressBar = new ProgressBar
-            {
-                Location = new Point(20, y + 56),
-                Size = new Size(380, 16),
-                Minimum = 0,
-                Maximum = 100,
-                Visible = false
-            };
-            Controls.Add(_progressBar);
-
-            _statusLabel = new Label
-            {
-                Text = string.Empty,
-                Tag = "theme:muted",
-                AutoSize = true,
-                MaximumSize = new Size(380, 0),
-                Location = new Point(20, y + 80)
-            };
-            Controls.Add(_statusLabel);
-            ClientSize = new Size(420, y + 128);
+            _progressBar = new ProgressBar { Dock = DockStyle.Top, Height = 12, Minimum = 0, Maximum = 100, Visible = false, Margin = new Padding(0, 0, 0, 12) };
+            body.Add(_progressBar);
+            _statusLabel = new Label { Text = string.Empty, Tag = "theme:muted", AutoSize = true, MaximumSize = new Size(440, 0), Margin = Padding.Empty };
+            body.Add(_statusLabel);
+            Shown += (sender, e) => { body.FitForm(this); _oldBox.Focus(); };
         }
 
-        /// <summary>
-        /// 添加密码行
-        /// </summary>
-        private int AddPasswordField(string label, ref TextBox box, int y)
+        protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            Label fieldLabel = new Label
+            if (_changing)
             {
-                Text = label,
-                AutoSize = true,
-                Location = new Point(20, y)
-            };
-            Controls.Add(fieldLabel);
-            box = new TextBox
-            {
-                Location = new Point(20, y + 22),
-                Size = new Size(380, 28),
-                Font = new Font("Microsoft YaHei UI", 10F),
-                UseSystemPasswordChar = true
-            };
-            Controls.Add(box);
-            return y + 58;
+                e.Cancel = true;
+                ShowToast("密码正在更新，请等待重新加密完成。", ToastKind.Info);
+                return;
+            }
+            base.OnFormClosing(e);
         }
 
         /// <summary>
@@ -129,6 +87,10 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         /// </summary>
         private async Task AttemptChangeAsync()
         {
+            if (_changing)
+            {
+                return;
+            }
             string oldPassword = _oldBox.Text;
             string newPassword = _newBox.Text;
             if (newPassword.Length < 6)
@@ -144,6 +106,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 return;
             }
 
+            _changing = true;
             _okButton.Enabled = false;
             _oldBox.Enabled = false;
             _newBox.Enabled = false;
@@ -153,6 +116,10 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _statusLabel.Text = "正在派生密钥并重新加密笔记…";
             IProgress<int> progress = new Progress<int>(value =>
             {
+                if (IsDisposed)
+                {
+                    return;
+                }
                 int percent = Math.Min(Math.Max(value, 0), 100);
                 _progressBar.Value = percent;
                 _statusLabel.Text = "正在重新加密… " + percent + "%";
@@ -168,6 +135,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                         _session.ReplaceUserKey(newKey);
                     }
                     _statusLabel.Text = "修改完成";
+                    _changing = false;
                     DialogResult = DialogResult.OK;
                     Close();
                     return;
@@ -185,6 +153,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             }
             finally
             {
+                _changing = false;
                 if (!IsDisposed && DialogResult != DialogResult.OK)
                 {
                     _okButton.Enabled = true;

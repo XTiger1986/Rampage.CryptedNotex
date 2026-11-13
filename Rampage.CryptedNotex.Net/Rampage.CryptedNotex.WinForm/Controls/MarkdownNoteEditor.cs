@@ -13,7 +13,7 @@ using Timer = System.Windows.Forms.Timer;
 namespace Rampage.CryptedNotex.WinForm.Controls
 {
     /// <summary>
-    /// Markdown 编辑器：等宽编辑 + WebView2 实时预览(本地离线资源)；缺 WebView2 Runtime 时折叠预览仅保留编辑
+    /// Markdown 编辑器：等宽编辑 + WebView2 实时预览(本地离线资源)；缺 WebView2 Runtime 时保留源码编辑与说明
     /// </summary>
     public class MarkdownNoteEditor : NoteEditorBase
     {
@@ -25,10 +25,14 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         private readonly TextBox _textBox;
         private readonly SplitContainer _splitter;
         private readonly Panel _previewFallbackPanel;
+        private readonly Panel _previewBody;
         private WebView2? _webView;
         private Timer? _previewTimer;
         private bool _previewReady;
         private bool _webViewAvailable;
+        private bool _loadingNote;
+        private bool _contentChanged;
+        private string _loadedContent = string.Empty;
 
         /// <summary>
         /// 构造 Markdown 编辑器
@@ -49,8 +53,9 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             };
             _textBox.TextChanged += (sender, e) =>
             {
-                if (!IsReadOnly)
+                if (!_loadingNote && !IsReadOnly)
                 {
+                    _contentChanged = true;
                     MarkDirty();
                 }
                 RestartPreviewTimer();
@@ -60,14 +65,15 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             _previewFallbackPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(12)
+                Padding = new Padding(24),
+                Tag = "theme:editor"
             };
             Label fallbackLabel = new Label
             {
-                Text = "未检测到 WebView2 Runtime，Markdown 仅编辑可用。\n安装后重启程序即可启用预览。",
+                Text = "预览暂不可用\n\n可继续编辑 Markdown 源码。\n安装 WebView2 Runtime 后重启即可预览。",
                 Tag = "theme:muted",
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft
+                TextAlign = ContentAlignment.MiddleCenter
             };
             _previewFallbackPanel.Controls.Add(fallbackLabel);
 
@@ -75,10 +81,32 @@ namespace Rampage.CryptedNotex.WinForm.Controls
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 520
+                Size = new Size(900, 600),
+                SplitterWidth = 6,
+                Panel1MinSize = 220,
+                Panel2MinSize = 220,
+                SplitterDistance = 450,
+                Tag = "theme:rule"
             };
-            _splitter.Panel1.Controls.Add(_textBox);
-            _splitter.Panel2.Controls.Add(_previewFallbackPanel);
+            _splitter.Panel1.Tag = "theme:editor";
+            _splitter.Panel2.Tag = "theme:editor";
+            Panel source = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 16, 20, 24),
+                Tag = "theme:editor"
+            };
+            source.Controls.Add(_textBox);
+            _previewBody = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Tag = "theme:editor"
+            };
+            _previewBody.Controls.Add(_previewFallbackPanel);
+            _splitter.Panel1.Controls.Add(source);
+            _splitter.Panel1.Controls.Add(BuildPaneLabel("MARKDOWN  /  源码"));
+            _splitter.Panel2.Controls.Add(_previewBody);
+            _splitter.Panel2.Controls.Add(BuildPaneLabel("阅读预览"));
             Controls.Add(_splitter);
 
             Internal.Themes.ThemeManager.CurrentChanged += OnThemeChanged;
@@ -88,16 +116,27 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         public override void LoadNote(NoteDetailDto dto)
         {
             Current = dto;
-            _textBox.Text = dto.PlainContent;
-            _textBox.SelectionStart = _textBox.Text.Length;
-            IsDirty = false;
+            _loadedContent = dto.PlainContent;
+            _loadingNote = true;
+            try
+            {
+                // 仅规范显示层换行，未经正文编辑时仍回传 _loadedContent 原始字串。
+                _textBox.Text = dto.PlainContent.ReplaceLineEndings("\r\n");
+                _textBox.SelectionStart = _textBox.Text.Length;
+            }
+            finally
+            {
+                _loadingNote = false;
+            }
+            _contentChanged = false;
+            MarkSaved();
             RenderPreview();
         }
 
         /// <inheritdoc />
         public override string CollectContent()
         {
-            return _textBox.Text;
+            return _contentChanged ? _textBox.Text : _loadedContent;
         }
 
         /// <inheritdoc />
@@ -109,7 +148,16 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         /// <inheritdoc />
         public override void SetEditorFont(string family, double size)
         {
-            _textBox.Font = CreateSafeEditorFont(family, size);
+            bool loading = _loadingNote;
+            _loadingNote = true;
+            try
+            {
+                _textBox.Font = CreateSafeEditorFont(family, size);
+            }
+            finally
+            {
+                _loadingNote = loading;
+            }
         }
 
         /// <inheritdoc />
@@ -167,6 +215,10 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 return;
             }
 
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
             _webViewAvailable = true;
             _webView = new WebView2
             {
@@ -180,6 +232,10 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                     AllowSingleSignOnUsingOSPrimaryAccount = false
                 });
                 await _webView.EnsureCoreWebView2Async(environment);
+                if (IsDisposed || _webView.IsDisposed)
+                {
+                    return;
+                }
                 _webView.CoreWebView2.SetVirtualHostNameToFolderMapping(ASSETS_HOST, assetsDirectory, CoreWebView2HostResourceAccessKind.Allow);
                 _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 _webView.CoreWebView2.Settings.IsZoomControlEnabled = false;
@@ -189,6 +245,10 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 if (File.Exists(templatePath))
                 {
                     string template = await File.ReadAllTextAsync(templatePath);
+                    if (IsDisposed || _webView.IsDisposed)
+                    {
+                        return;
+                    }
                     _webView.CoreWebView2.NavigateToString(template);
                     _previewReady = true;
                     // 预览就绪后渲染当前内容并同步主题(模板加载完成有一小段延迟,稍后补渲染)
@@ -204,13 +264,35 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 return;
             }
 
+            if (IsDisposed || Disposing || _webView == null || _webView.IsDisposed)
+            {
+                return;
+            }
+
             // 用 WebView 替换降级面板
-            _splitter.Panel2.SuspendLayout();
-            _splitter.Panel2.Controls.Remove(_previewFallbackPanel);
-            _splitter.Panel2.Controls.Add(_webView);
-            _splitter.Panel2.ResumeLayout();
+            _previewBody.SuspendLayout();
+            _previewBody.Controls.Remove(_previewFallbackPanel);
+            _previewBody.Controls.Add(_webView);
+            _previewBody.ResumeLayout();
             Internal.Themes.ThemeManager.Apply(_splitter.Panel1);
             ApplyPreviewLayout();
+        }
+
+        /// <summary>
+        /// 编辑与预览区的轻量标题，不占用正文空间。
+        /// </summary>
+        private static Control BuildPaneLabel(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                Dock = DockStyle.Top,
+                Height = 38,
+                Padding = new Padding(20, 0, 16, 0),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Tag = "theme:muted",
+                Font = new Font("Microsoft YaHei UI", 8.5F)
+            };
         }
 
         /// <summary>
@@ -325,6 +407,8 @@ namespace Rampage.CryptedNotex.WinForm.Controls
                 Internal.Themes.ThemeManager.CurrentChanged -= OnThemeChanged;
                 _previewTimer?.Dispose();
                 _previewTimer = null;
+                _webView?.Dispose();
+                _previewFallbackPanel.Dispose();
             }
             base.Dispose(disposing);
         }

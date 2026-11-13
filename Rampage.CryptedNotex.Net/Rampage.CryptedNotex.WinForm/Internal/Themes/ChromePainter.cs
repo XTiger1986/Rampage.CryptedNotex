@@ -8,84 +8,76 @@ using System.Windows.Forms;
 namespace Rampage.CryptedNotex.WinForm.Internal.Themes
 {
     /// <summary>
-    /// 把当前主题的金属纹理、斜切光边和徽记画到按钮与面板上。事件只订阅一次，每次重绘读取当前主题。
+    /// 主题控件绘制与交互反馈。绘制时读取当前主题，事件仅订阅一次。
     /// </summary>
     internal static class ChromePainter
     {
         private static readonly ConditionalWeakTable<Control, object> _hooks = new ConditionalWeakTable<Control, object>();
         private static readonly ConditionalWeakTable<Button, ButtonState> _buttonStates = new ConditionalWeakTable<Button, ButtonState>();
 
-        /// <summary>
-        /// 按钮按下态(悬停态无状态,绘制时按光标位置现场判定)
-        /// </summary>
         private sealed class ButtonState
         {
-            /// <summary>
-            /// 鼠标按下中
-            /// </summary>
             public bool Pressed;
+            public bool Active;
         }
 
         /// <summary>
-        /// 列表行悬停色：选中色的半透明洗版,铺在行底色上,金属与扁平主题通用
+        /// 设置工具按钮的持续选中状态，与鼠标按压状态分开存储，切换主题时仍由当前令牌绘制。
         /// </summary>
+        public static void SetButtonActive(Button button, bool active)
+        {
+            _buttonStates.GetValue(button, _ => new ButtonState()).Active = active;
+            Color fill = ButtonFill(button);
+            button.BackColor = fill;
+            button.FlatAppearance.MouseOverBackColor = fill;
+            button.FlatAppearance.MouseDownBackColor = fill;
+            button.Invalidate();
+        }
+
         public static Color RowHoverColor()
         {
-            return Color.FromArgb(64, ThemeManager.GetColor("selectionBack"));
+            return Color.FromArgb(72, ThemeManager.GetColor("selectionBack"));
         }
 
-        /// <summary>
-        /// 按钮是否处于悬停(无状态判定,绘制期按光标与客户区的关系得出)
-        /// </summary>
         public static bool IsButtonHover(Button button)
         {
             return button.Enabled && button.ClientRectangle.Contains(button.PointToClient(Cursor.Position));
         }
 
         /// <summary>
-        /// 当前主题是否启用金属质感(metal 不是 none)
+        /// 保留旧自定义主题的 chrome 配置；新版内置主题使用纯色界面和独立身份图形。
         /// </summary>
         public static bool UsesChrome
         {
             get
             {
-                ThemeChrome? chrome = ThemeManager.Current.Chrome;
-                return chrome != null
-                    && !string.IsNullOrWhiteSpace(chrome.Metal)
-                    && !string.Equals(chrome.Metal, "none", StringComparison.OrdinalIgnoreCase);
+                string? metal = ThemeManager.Current.Chrome?.Metal;
+                return !string.IsNullOrWhiteSpace(metal) && !string.Equals(metal, "none", StringComparison.OrdinalIgnoreCase);
             }
         }
 
-        /// <summary>
-        /// 当前主题是否有可用壁纸
-        /// </summary>
         public static bool HasWallpaper
         {
-            get
-            {
-                return ChromeAssets.GetWallpaper(ThemeManager.Current.Chrome?.Wallpaper) != null;
-            }
+            get { return ChromeAssets.GetWallpaper(ThemeManager.Current.Chrome?.Wallpaper) != null; }
         }
 
-        /// <summary>
-        /// 父控件是否铺了金属(子标签需要让出底色)
-        /// </summary>
         public static bool HostsMetal(Control? control)
         {
             return UsesChrome && control != null && IsSurfaceTag(control.Tag as string);
         }
 
-        /// <summary>
-        /// 遍历控件树：补订阅绘制，并按当前主题刷新壁纸与金属底图
-        /// </summary>
-        /// <param name="root">根控件</param>
+        public static Color MetalSolidColor()
+        {
+            if (UsesChrome)
+            {
+                return string.Equals(ThemeManager.Current.Chrome?.Metal, "silver", StringComparison.OrdinalIgnoreCase)
+                    ? Color.FromArgb(214, 220, 226) : Color.FromArgb(28, 32, 38);
+            }
+            return ThemeManager.GetColor("panelBack");
+        }
+
         public static void RefreshTree(Control root)
         {
-            if (root == null)
-            {
-                return;
-            }
-
             RefreshOne(root);
             foreach (Control child in root.Controls)
             {
@@ -93,110 +85,65 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
             }
         }
 
-        /// <summary>
-        /// 右键菜单使用当前主题的底色与文字色
-        /// </summary>
-        /// <param name="menu">菜单</param>
         public static void StyleMenu(ContextMenuStrip menu)
         {
             menu.Renderer = new ChromeMenuRenderer();
-            Color back = ThemeManager.GetColor("panelAltBack");
-            Color text = ThemeManager.GetColor("text");
-            menu.BackColor = back;
-            menu.ForeColor = text;
+            menu.BackColor = ThemeManager.GetColor("panelAltBack");
+            menu.ForeColor = ThemeManager.GetColor("text");
             foreach (ToolStripItem item in menu.Items)
             {
-                item.BackColor = back;
-                item.ForeColor = text;
+                item.BackColor = menu.BackColor;
+                item.ForeColor = menu.ForeColor;
             }
         }
 
-        /// <summary>
-        /// 金属近似纯色(标签底，避免透明标签画出壁纸)
-        /// </summary>
-        public static Color MetalSolidColor()
-        {
-            string? metal = ThemeManager.Current.Chrome?.Metal;
-            if (string.Equals(metal, "black", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(28, 32, 38);
-            }
-            if (string.Equals(metal, "silver", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(214, 220, 226);
-            }
-            return ThemeManager.GetColor("panelBack");
-        }
-
-        /// <summary>
-        /// 单个控件刷新底图并保证绘制钩子只挂一次
-        /// </summary>
         private static void RefreshOne(Control control)
         {
             EnsureHook(control);
             string? tag = control.Tag as string;
-
             if (control is Form form)
             {
-                if (tag == "theme:wallpaper" && HasWallpaper)
-                {
-                    form.BackgroundImage = ChromeAssets.GetWallpaper(ThemeManager.Current.Chrome?.Wallpaper);
-                    form.BackgroundImageLayout = ImageLayout.Stretch;
-                }
-                else
-                {
-                    form.BackgroundImage = null;
-                }
+                form.BackgroundImage = tag == "theme:wallpaper" && HasWallpaper
+                    ? ChromeAssets.GetWallpaper(ThemeManager.Current.Chrome?.Wallpaper) : null;
+                form.BackgroundImageLayout = ImageLayout.Stretch;
             }
-
-            if (tag == "theme:inset")
+            else if (tag == "theme:inset")
             {
                 control.BackgroundImage = null;
                 control.BackColor = HasWallpaper ? Color.Transparent : ThemeManager.GetColor("windowBack");
             }
-            else if (IsSurfaceTag(tag) && UsesChrome)
-            {
-                control.BackgroundImage = ChromeAssets.Metal(ThemeManager.Current.Chrome?.Metal);
-                control.BackgroundImageLayout = ImageLayout.Tile;
-                control.BackColor = MetalSolidColor();
-            }
             else if (IsSurfaceTag(tag))
             {
-                control.BackgroundImage = null;
+                control.BackgroundImage = UsesChrome ? ChromeAssets.Metal(ThemeManager.Current.Chrome?.Metal) : null;
+                control.BackgroundImageLayout = ImageLayout.Tile;
+                if (UsesChrome)
+                {
+                    control.BackColor = MetalSolidColor();
+                }
             }
 
             if (control is Button button)
             {
                 Color fill = ButtonFill(button);
-                if (UsesChrome)
-                {
-                    // 金属模式由 OnButtonPaint 全权绘制,FlatAppearance 与底色保持一致避免系统态闪边
-                    button.FlatAppearance.MouseOverBackColor = fill;
-                    button.FlatAppearance.MouseDownBackColor = fill;
-                    button.BackColor = fill;
-                    button.ForeColor = ButtonFore(button);
-                }
-                else
-                {
-                    // 扁平模式：悬停提亮、按下压暗,运行时派生,不新增主题令牌
-                    button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(fill, 0.18f);
-                    button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(fill, 0.12f);
-                }
+                button.BackColor = fill;
+                button.ForeColor = ButtonFore(button);
+                button.FlatAppearance.MouseOverBackColor = fill;
+                button.FlatAppearance.MouseDownBackColor = fill;
             }
 
+            if (control.IsHandleCreated && HasNativeScrollbars(control))
+            {
+                ApplyScrollbarTheme(control);
+            }
             control.Invalidate();
         }
 
-        /// <summary>
-        /// 首次遇到控件时订阅自绘
-        /// </summary>
         private static void EnsureHook(Control control)
         {
             if (_hooks.TryGetValue(control, out _))
             {
                 return;
             }
-
             _hooks.Add(control, new object());
             EnableDoubleBuffer(control);
             if (control is Button button)
@@ -204,7 +151,6 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 button.FlatStyle = FlatStyle.Flat;
                 button.FlatAppearance.BorderSize = 0;
                 button.Paint += OnButtonPaint;
-                // 悬停/按下反馈需要重绘时机：进入/离开/按下/抬起都触发一次失效
                 ButtonState state = _buttonStates.GetValue(button, _ => new ButtonState());
                 button.MouseEnter += (sender, e) => button.Invalidate();
                 button.MouseLeave += (sender, e) =>
@@ -214,7 +160,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                 };
                 button.MouseDown += (sender, e) =>
                 {
-                    state.Pressed = true;
+                    state.Pressed = e.Button == MouseButtons.Left;
                     button.Invalidate();
                 };
                 button.MouseUp += (sender, e) =>
@@ -222,381 +168,290 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
                     state.Pressed = false;
                     button.Invalidate();
                 };
+                button.KeyDown += (sender, e) =>
+                {
+                    if (e.KeyCode == Keys.Space)
+                    {
+                        state.Pressed = true;
+                        button.Invalidate();
+                    }
+                };
+                button.KeyUp += (sender, e) =>
+                {
+                    state.Pressed = false;
+                    button.Invalidate();
+                };
+                button.GotFocus += (sender, e) => button.Invalidate();
+                button.LostFocus += (sender, e) =>
+                {
+                    state.Pressed = false;
+                    button.Invalidate();
+                };
+                button.EnabledChanged += (sender, e) => button.Invalidate();
             }
             else if (IsSurfaceTag(control.Tag as string))
             {
-                EnableTransparent(control);
                 control.Paint += OnSurfacePaint;
             }
 
-            // 暗色主题下把系统滚动条/下拉切到 Windows 暗色资源(DarkMode_Explorer),浅色切回默认
-            if (control is ListView || control is ListBox || control is TextBox || control is TreeView || control is ComboBox)
+            if (HasNativeScrollbars(control))
             {
                 control.HandleCreated += (sender, e) => ApplyScrollbarTheme(control);
-                if (control.IsHandleCreated)
-                {
-                    ApplyScrollbarTheme(control);
-                }
             }
 
-            // 输入框聚焦辉光:聚焦时底色向强调色轻微混合,失焦还原
             if (control is TextBox input)
             {
-                input.GotFocus += (sender, e) => input.BackColor = InputBackColor(true);
-                input.LostFocus += (sender, e) => input.BackColor = InputBackColor(false);
+                input.GotFocus += (sender, e) => RefreshInputFocus(input, true);
+                input.LostFocus += (sender, e) => RefreshInputFocus(input, false);
             }
         }
 
-        /// <summary>
-        /// 滚动条/下拉的系统主题(暗色主题用 DarkMode_Explorer 资源;失败静默保持系统默认)
-        /// </summary>
+        private static void RefreshInputFocus(TextBox input, bool focused)
+        {
+            string? tag = input.Tag as string;
+            if (tag != "theme:editor" && tag != "theme:editorTitle" && tag != "theme:document")
+            {
+                input.BackColor = InputBackColor(focused);
+            }
+        }
+
+        private static bool HasNativeScrollbars(Control control)
+        {
+            return control is ListView || control is ListBox || control is TextBoxBase
+                || control is TreeView || control is ComboBox || control is NumericUpDown;
+        }
+
         private static void ApplyScrollbarTheme(Control control)
         {
+            if (!control.IsHandleCreated)
+            {
+                return;
+            }
             try
             {
                 SetWindowTheme(control.Handle, ThemeManager.Current.DarkTitleBar ? "DarkMode_Explorer" : string.Empty, null);
             }
             catch
             {
-                // 旧系统无 uxtheme 支持,忽略
+                // 旧版 Windows 可继续使用系统滚动条。
             }
         }
 
-        /// <summary>
-        /// 输入框底色:聚焦时向强调色混合 28%,给出可见的焦点辉光
-        /// </summary>
         public static Color InputBackColor(bool focused)
         {
             Color back = ThemeManager.GetColor("inputBack");
-            if (!focused)
-            {
-                return back;
-            }
-            Color accent = ThemeManager.GetColor("accent");
-            return Color.FromArgb(
-                back.R + (accent.R - back.R) * 28 / 100,
-                back.G + (accent.G - back.G) * 28 / 100,
-                back.B + (accent.B - back.B) * 28 / 100);
+            return focused ? Blend(back, ThemeManager.GetColor("accent"), 0.08F) : back;
         }
 
-        /// <summary>
-        /// 允许子标签透明，从而露出平铺的金属纹理
-        /// </summary>
-        private static void EnableTransparent(Control control)
-        {
-            typeof(Control).InvokeMember(
-                "SetStyle",
-                System.Reflection.BindingFlags.InvokeMethod | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                null,
-                control,
-                new object[] { ControlStyles.SupportsTransparentBackColor | ControlStyles.UserPaint, true });
-        }
-
-        /// <summary>
-        /// 金属/强调/危险按钮盖住系统按钮外观
-        /// </summary>
         private static void OnButtonPaint(object? sender, PaintEventArgs e)
         {
-            if (!UsesChrome || sender is not Button button)
+            if (sender is not Button button || button.Width < 3 || button.Height < 3)
             {
                 return;
             }
 
             Graphics g = e.Graphics;
             Rectangle rect = button.ClientRectangle;
-            if (rect.Width <= 1 || rect.Height <= 1)
-            {
-                return;
-            }
-
             string? tag = button.Tag as string;
-            bool accent = tag == "theme:accent" && button.Enabled;
-            bool danger = tag == "theme:danger" && button.Enabled;
+            bool primary = tag == "theme:accent" || tag == "theme:danger";
+            bool tool = tag == "theme:tool";
             bool hover = IsButtonHover(button);
             ButtonState state = _buttonStates.GetValue(button, _ => new ButtonState());
-            bool pressed = state.Pressed && hover;
+            bool pressed = state.Pressed && button.Enabled;
+            bool active = state.Active && button.Enabled;
+            Color parent = button.Parent?.BackColor ?? ThemeManager.GetColor("panelBack");
             Color fill = ButtonFill(button);
-            if (pressed)
+            Color fore = button.Enabled ? ButtonFore(button) : ThemeManager.GetColor("textSecondary");
+            if (button.Enabled && (hover || pressed))
             {
-                fill = ControlPaint.Dark(fill, 0.08f);
+                fill = Blend(fill, primary ? fore : ThemeManager.GetColor("accent"), pressed ? 0.15F : 0.07F);
             }
-            else if (hover && (accent || danger))
-            {
-                fill = ControlPaint.Light(fill, 0.08f);
-            }
-            Color fore = ButtonFore(button);
-            Color glow = GlowColor();
 
+            using (SolidBrush clear = new SolidBrush(parent))
+            {
+                g.FillRectangle(clear, rect);
+            }
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            RectangleF outline = new RectangleF(0.75F, 0.75F, rect.Width - 1.5F, rect.Height - 1.5F);
+            using (GraphicsPath shape = ButtonPath(outline))
             using (SolidBrush brush = new SolidBrush(fill))
             {
-                g.FillRectangle(brush, rect);
-            }
-            if (!accent && !danger)
-            {
-                Image? metal = ChromeAssets.Metal(ThemeManager.Current.Chrome?.Metal);
-                if (metal != null)
+                g.FillPath(brush, shape);
+                if (!primary && (!tool || hover || button.Focused || active))
                 {
-                    using (TextureBrush texture = new TextureBrush(metal, WrapMode.Tile))
+                    Color edge = hover || button.Focused || active ? ThemeManager.GetColor("accent") : ThemeManager.GetColor("border");
+                    using (Pen pen = new Pen(edge, ThemeManager.Current.Id == "contrast" ? 2F : 1F))
                     {
-                        g.FillRectangle(texture, rect);
+                        g.DrawPath(pen, shape);
+                    }
+                }
+                if (button.Focused && button.Enabled)
+                {
+                    RectangleF focus = outline;
+                    focus.Inflate(-3F, -3F);
+                    using (GraphicsPath focusPath = ButtonPath(focus))
+                    using (Pen focusPen = new Pen(primary ? fore : ThemeManager.GetColor("accent"), 1.5F))
+                    {
+                        focusPen.DashStyle = DashStyle.Dot;
+                        g.DrawPath(focusPen, focusPath);
                     }
                 }
             }
 
-            // 光影语言：悬停=顶部高光提亮、普通按钮边缘点亮为主题辉光；按下=高光熄灭下沉
-            int highlightAlpha = pressed ? 0 : (hover ? 150 : 110);
-            using (Pen highlight = new Pen(Color.FromArgb(accent || danger ? 80 : highlightAlpha, Color.White), highlightAlpha > 0 ? 1F : 0.01F))
-            using (Pen shadow = new Pen(Color.FromArgb(pressed ? 120 : 90, Color.Black)))
-            using (Pen edge = BuildEdgePen(glow, accent || danger, hover, pressed))
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+            ContentAlignment align = button.TextAlign;
+            flags |= align == ContentAlignment.MiddleLeft || align == ContentAlignment.TopLeft || align == ContentAlignment.BottomLeft
+                ? TextFormatFlags.Left : align == ContentAlignment.MiddleRight || align == ContentAlignment.TopRight || align == ContentAlignment.BottomRight
+                ? TextFormatFlags.Right : TextFormatFlags.HorizontalCenter;
+            Rectangle textRect = Rectangle.Inflate(rect, -8, -2);
+            if (pressed)
             {
-                if (highlightAlpha > 0)
-                {
-                    g.DrawLine(highlight, 1, 1, rect.Width - 2, 1);
-                }
-                g.DrawLine(shadow, 1, rect.Height - 2, rect.Width - 2, rect.Height - 2);
-                g.DrawRectangle(edge, 0, 0, rect.Width - 1, rect.Height - 1);
+                textRect.Offset(0, 1);
             }
-
-            TextRenderer.DrawText(
-                g,
-                button.Text,
-                button.Font,
-                rect,
-                button.Enabled ? fore : ThemeManager.GetColor("textSecondary"),
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-
-            if (button.Focused && button.Enabled)
-            {
-                Rectangle focus = rect;
-                focus.Inflate(-3, -3);
-                ControlPaint.DrawFocusRectangle(g, focus);
-            }
+            TextRenderer.DrawText(g, button.Text, button.Font, textRect, fore, flags);
         }
 
-        /// <summary>
-        /// 金属面板只补光边、徽记和品牌名，底图由 BackgroundImage 平铺
-        /// </summary>
+        private static GraphicsPath ButtonPath(RectangleF rect)
+        {
+            GraphicsPath path = new GraphicsPath();
+            string shape = ThemeManager.Current.Appearance?.ButtonShape ?? "rounded";
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                return path;
+            }
+            if (shape == "cut")
+            {
+                float cut = Math.Min(7F, Math.Min(rect.Width, rect.Height) / 4F);
+                path.AddPolygon(new[]
+                {
+                    new PointF(rect.Left + cut, rect.Top), new PointF(rect.Right, rect.Top),
+                    new PointF(rect.Right, rect.Bottom - cut), new PointF(rect.Right - cut, rect.Bottom),
+                    new PointF(rect.Left, rect.Bottom), new PointF(rect.Left, rect.Top + cut)
+                });
+            }
+            else if (shape == "square")
+            {
+                path.AddRectangle(rect);
+            }
+            else
+            {
+                float diameter = Math.Min(ThemeManager.Current.Id == "alienmorph" || ThemeManager.Current.Id == "violet" ? 18F : 10F, Math.Min(rect.Width, rect.Height));
+                path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
+                path.AddArc(rect.Right - diameter, rect.Top, diameter, diameter, 270, 90);
+                path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+                path.AddArc(rect.Left, rect.Bottom - diameter, diameter, diameter, 90, 90);
+                path.CloseFigure();
+            }
+            return path;
+        }
+
         private static void OnSurfacePaint(object? sender, PaintEventArgs e)
         {
-            if (sender is not Control control)
+            if (sender is not Control control || control.Width < 2 || control.Height < 2)
             {
                 return;
             }
-
             string? tag = control.Tag as string;
-            Graphics g = e.Graphics;
             Rectangle rect = control.ClientRectangle;
-            if (rect.Width <= 1 || rect.Height <= 1)
-            {
-                return;
-            }
-
-            if (!UsesChrome)
+            using (Pen border = new Pen(ThemeManager.GetColor("border"), ThemeManager.Current.Id == "contrast" ? 2F : 1F))
             {
                 if (tag == "theme:card" || tag == "theme:cardEmblem")
                 {
-                    using (Pen pen = new Pen(ThemeManager.GetColor("border")))
-                    {
-                        g.DrawRectangle(pen, 0, 0, rect.Width - 1, rect.Height - 1);
-                    }
-                }
-                if (tag == "theme:cardEmblem")
-                {
-                    DrawEmblem(g, rect, 72, 16);
-                }
-                return;
-            }
-
-            Color glow = GlowColor();
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (Pen highlight = new Pen(Color.FromArgb(90, Color.White)))
-            using (Pen glowPen = new Pen(glow, 2F))
-            {
-                g.DrawLine(highlight, 1, 1, rect.Width - 2, 1);
-                if (tag == "theme:card" || tag == "theme:cardEmblem")
-                {
-                    g.DrawRectangle(glowPen, 1, 1, rect.Width - 3, rect.Height - 3);
+                    e.Graphics.DrawRectangle(border, 0, 0, rect.Width - 1, rect.Height - 1);
                 }
                 else if (tag == "theme:sidebar")
                 {
-                    g.DrawLine(glowPen, rect.Width - 2, 10, rect.Width - 2, rect.Height - 10);
+                    e.Graphics.DrawLine(border, rect.Width - 1, 0, rect.Width - 1, rect.Height);
                 }
-                else
+                else if (tag == "theme:chrome")
                 {
-                    g.DrawLine(glowPen, 10, rect.Height - 2, rect.Width - 10, rect.Height - 2);
+                    e.Graphics.DrawLine(border, 0, 0, rect.Width, 0);
                 }
             }
-
-            if (tag == "theme:cardEmblem")
+            if (tag == "theme:brand")
             {
-                DrawEmblem(g, rect, 84, 18);
+                DrawBrand(e.Graphics, control, rect);
             }
-            else if (tag == "theme:brand")
+            else if (tag == "theme:cardEmblem")
             {
-                DrawBrand(g, control, rect);
+                Image? emblem = ChromeAssets.Emblem;
+                if (emblem != null)
+                {
+                    e.Graphics.DrawImage(emblem, new Rectangle((rect.Width - 68) / 2, 18, 68, 68));
+                }
             }
         }
 
-        /// <summary>
-        /// 在矩形顶部居中画徽记
-        /// </summary>
-        private static void DrawEmblem(Graphics g, Rectangle rect, int size, int top)
-        {
-            Image? emblem = ChromeAssets.Emblem;
-            if (emblem == null)
-            {
-                return;
-            }
-
-            int draw = Math.Min(size, rect.Width - 24);
-            if (draw < 16)
-            {
-                return;
-            }
-
-            InterpolationMode old = g.InterpolationMode;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.DrawImage(emblem, new Rectangle((rect.Width - draw) / 2, top, draw, draw));
-            g.InterpolationMode = old;
-        }
-
-        /// <summary>
-        /// 侧栏品牌条：徽记 + 控件 Text
-        /// </summary>
         private static void DrawBrand(Graphics g, Control control, Rectangle rect)
         {
-            Image? emblem = ChromeAssets.Emblem;
-            int size = Math.Min(46, rect.Height - 12);
-            int y = Math.Max(6, (rect.Height - size) / 2);
-            if (emblem != null && size >= 16)
+            int size = Math.Min(36, rect.Height - 20);
+            if (size > 8 && ChromeAssets.Emblem != null)
             {
-                InterpolationMode old = g.InterpolationMode;
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                g.DrawImage(emblem, new Rectangle(12, y, size, size));
-                g.InterpolationMode = old;
+                g.DrawImage(ChromeAssets.Emblem, new Rectangle(16, (rect.Height - size) / 2, size, size));
             }
-
-            int textX = emblem == null ? 12 : 12 + size + 8;
-            Rectangle textRect = new Rectangle(textX, 0, Math.Max(0, rect.Width - textX - 8), rect.Height);
-            using (Font font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point))
+            using (Font font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold))
             {
-                TextRenderer.DrawText(
-                    g,
-                    control.Text,
-                    font,
-                    textRect,
+                TextRenderer.DrawText(g, control.Text, font,
+                    new Rectangle(size + 28, 0, Math.Max(0, rect.Width - size - 40), rect.Height),
                     ThemeManager.GetColor("text"),
                     TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             }
         }
 
-        /// <summary>
-        /// 按钮边缘笔：强调/危险按钮常辉光,普通按钮悬停时点亮辉光,按下时辉光转暗
-        /// </summary>
-        private static Pen BuildEdgePen(Color glow, bool glowing, bool hover, bool pressed)
-        {
-            if (glowing)
-            {
-                if (pressed)
-                {
-                    return new Pen(Color.FromArgb(130, glow), 1F);
-                }
-                return hover ? new Pen(glow, 2F) : new Pen(glow, 1F);
-            }
-            if (hover && !pressed)
-            {
-                return new Pen(glow, 1.4F);
-            }
-            return new Pen(ThemeManager.GetColor("border"), 1F);
-        }
-
-        /// <summary>
-        /// 按钮填充色
-        /// </summary>
         private static Color ButtonFill(Button button)
         {
-            string? tag = button.Tag as string;
             if (!button.Enabled)
             {
-                return MetalSolidColor();
+                return ThemeManager.GetColor("panelBack");
             }
-            if (tag == "theme:accent")
+            string? tag = button.Tag as string;
+            return tag switch
             {
-                return ThemeManager.GetColor("accent");
-            }
-            if (tag == "theme:danger")
-            {
-                return ThemeManager.GetColor("danger");
-            }
-            return MetalSolidColor();
+                "theme:accent" => ThemeManager.GetColor("accent"),
+                "theme:danger" => ThemeManager.GetColor("danger"),
+                "theme:tool" => _buttonStates.GetValue(button, _ => new ButtonState()).Active
+                    ? ThemeManager.GetColor("selectionBack")
+                    : button.Parent?.BackColor ?? ThemeManager.GetColor("panelBack"),
+                _ => ThemeManager.GetColor("panelAltBack")
+            };
         }
 
-        /// <summary>
-        /// 按钮文字色。危险按钮默认白字,主题可通过 dangerText 令牌覆盖。
-        /// </summary>
         private static Color ButtonFore(Button button)
         {
-            string? tag = button.Tag as string;
-            if (tag == "theme:danger")
+            return (button.Tag as string) switch
             {
-                return ThemeManager.GetColor("dangerText");
-            }
-            if (tag == "theme:accent")
-            {
-                return ThemeManager.GetColor("accentText");
-            }
-            return ThemeManager.GetColor("text");
+                "theme:accent" => ThemeManager.GetColor("accentText"),
+                "theme:danger" => ThemeManager.GetColor("dangerText"),
+                "theme:tool" => button.ForeColor,
+                _ => ThemeManager.GetColor("text")
+            };
         }
 
-        /// <summary>
-        /// 当前主题发光色
-        /// </summary>
-        private static Color GlowColor()
+        private static Color Blend(Color back, Color fore, float amount)
         {
-            ThemeChrome? chrome = ThemeManager.Current.Chrome;
-            if (chrome != null && ThemeManager.TryParseColor(chrome.Glow, out Color glow))
-            {
-                return glow;
-            }
-            return ThemeManager.GetColor("accent");
+            return Color.FromArgb(
+                (int)(back.R + (fore.R - back.R) * amount),
+                (int)(back.G + (fore.G - back.G) * amount),
+                (int)(back.B + (fore.B - back.B) * amount));
         }
 
-        /// <summary>
-        /// 会铺金属底图的 Tag
-        /// </summary>
         private static bool IsSurfaceTag(string? tag)
         {
-            return tag == "theme:card"
-                || tag == "theme:cardEmblem"
-                || tag == "theme:chrome"
-                || tag == "theme:brand"
-                || tag == "theme:sidebar";
+            return tag == "theme:card" || tag == "theme:cardEmblem" || tag == "theme:chrome"
+                || tag == "theme:brand" || tag == "theme:sidebar";
         }
 
-        /// <summary>
-        /// 打开控件双缓冲(受保护属性)
-        /// </summary>
         private static void EnableDoubleBuffer(Control control)
         {
-            typeof(Control).InvokeMember(
-                "DoubleBuffered",
+            typeof(Control).InvokeMember("DoubleBuffered",
                 System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                null,
-                control,
-                new object[] { true });
+                null, control, new object[] { true });
         }
 
-        /// <summary>
-        /// 切换控件系统视觉主题(滚动条/下拉配色)
-        /// </summary>
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         private static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
     }
 
-    /// <summary>
-    /// 菜单配色表，跟当前主题走
-    /// </summary>
     internal sealed class ChromeMenuColorTable : ProfessionalColorTable
     {
         /// <summary>

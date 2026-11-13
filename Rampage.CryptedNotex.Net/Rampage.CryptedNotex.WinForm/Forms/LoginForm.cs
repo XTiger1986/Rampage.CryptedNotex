@@ -1,4 +1,4 @@
-using Rampage.CryptedNotex.BLL;
+﻿using Rampage.CryptedNotex.BLL;
 using Rampage.CryptedNotex.Model.Dto;
 using Rampage.CryptedNotex.WinForm.Internal;
 using Rampage.CryptedNotex.WinForm.Internal.Themes;
@@ -25,7 +25,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private Label _subtitleLabel = null!;
         private Label _userLabel = null!;
         private ListBox _userList = null!;
-        private Label _addUserLink = null!;
+        private LinkLabel _addUserLink = null!;
         private Label _passwordLabel = null!;
         private TextBox _passwordBox = null!;
         private Button _loginButton = null!;
@@ -33,7 +33,9 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         private Label _hintLabel = null!;
         private Timer _countdownTimer = null!;
         private bool _loggingIn;
-        private Size _clientSize;
+        private AuthArtworkPanel _artwork = null!;
+        private Panel _shell = null!;
+        private bool _layingOut;
         private int _userHoverIndex = -1;
 
         /// <summary>
@@ -45,30 +47,30 @@ namespace Rampage.CryptedNotex.WinForm.Forms
         {
             _session = session;
             Text = NotexBrand.DisplayName + " · 登录";
-            Tag = "theme:wallpaper";
-            ClientSize = new Size(560, 640);
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            ClientSize = new Size(940, 660);
+            MinimumSize = new Size(560, 480);
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
             MinimizeBox = false;
             BuildUi();
         }
 
         /// <summary>
-        /// 构建壁纸底上的金属登录卡片（控件只创建，位置交给 <see cref="LayoutCard"/> 统一流动排版）
+        /// 构建主题插画与可滚动表单的双区登录页。
         /// </summary>
         private void BuildUi()
         {
-            _card = new Panel
-            {
-                Size = new Size(440, 560),
-                Tag = "theme:cardEmblem"
-            };
-            Controls.Add(_card);
+            _shell = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
+            Controls.Add(_shell);
+            _artwork = new AuthArtworkPanel { Dock = DockStyle.Left, Width = 360 };
+            _card = new Panel { Dock = DockStyle.Fill, Tag = "theme:card", AutoScroll = true };
+            _shell.Controls.Add(_card);
+            _shell.Controls.Add(_artwork);
             Panel card = _card;
 
             _titleLabel = new Label
             {
-                Text = NotexBrand.DisplayName,
+                Text = "欢迎回来",
                 Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
                 AutoSize = true
             };
@@ -76,7 +78,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _subtitleLabel = new Label
             {
-                Text = "本地加密笔记，只存在这台设备上",
+                Text = "选择账户，解锁你的私人档案。",
                 Tag = "theme:muted",
                 AutoSize = true
             };
@@ -96,11 +98,11 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                 DrawMode = DrawMode.OwnerDrawFixed,
                 ItemHeight = 32,
                 Font = new Font("Microsoft YaHei UI", 10F),
-                BorderStyle = BorderStyle.FixedSingle,
+                BorderStyle = BorderStyle.None,
                 IntegralHeight = false
             };
             _userList.DrawItem += UserListDrawItem;
-            _userList.SelectedIndexChanged += (sender, e) => _passwordBox.Focus();
+            _userList.DoubleClick += (sender, e) => _passwordBox.Focus();
             _userList.MouseMove += (sender, e) =>
             {
                 int index = _userList.IndexFromPoint(e.Location);
@@ -120,14 +122,15 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             };
             card.Controls.Add(_userList);
 
-            _addUserLink = new Label
+            _addUserLink = new LinkLabel
             {
-                Text = "添加用户",
+                Text = "+ 添加账户",
                 Tag = "theme:link",
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                TabStop = true,
+                AccessibleName = "添加一个新账户"
             };
-            _addUserLink.Click += (sender, e) => OpenCreateUserForm();
+            _addUserLink.LinkClicked += (sender, e) => OpenCreateUserForm();
             card.Controls.Add(_addUserLink);
 
             _passwordLabel = new Label
@@ -150,7 +153,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _loginButton = new Button
             {
-                Text = "登录",
+                Text = "解锁档案",
                 Tag = "theme:accent",
                 Size = new Size(184, 38),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
@@ -161,7 +164,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _exitButton = new Button
             {
-                Text = "退出",
+                Text = "退出程序",
                 Size = new Size(184, 36),
                 Font = new Font("Microsoft YaHei UI", 9.5F)
             };
@@ -175,7 +178,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
 
             _hintLabel = new Label
             {
-                Text = "忘记密码 = 数据无法恢复(无后门)",
+                Text = "请牢记密码。忘记密码后，正文与附件将无法恢复。",
                 Tag = "theme:muted",
                 AutoSize = true,
                 MaximumSize = new Size(384, 0)
@@ -193,72 +196,87 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             {
                 if (!_loggingIn)
                 {
-                    _hintLabel.Text = "忘记密码 = 数据无法恢复(无后门)";
+                    _hintLabel.Text = "请牢记密码。忘记密码后，正文与附件将无法恢复。";
                 }
             };
 
+            _card.SizeChanged += (sender, e) => LayoutCard();
+            _hintLabel.TextChanged += (sender, e) => LayoutCard();
             LayoutCard();
         }
 
         /// <summary>
-        /// 按实测控件高度自上而下流动排版登录卡片。
-        /// 字体随系统 DPI 放大而坐标不缩放时（本机 150% 缩放），写死的紧凑间距会让标题压住副标题，
-        /// 改为逐行累计实测高度即可在任意缩放下不叠字；100% 缩放时各位置与原设计值一致。
-        /// Flow the login card top-down using measured control heights: with fonts scaled by DPI but
-        /// coordinates not (this machine runs 150%), hardcoded tight gaps made the title overlap the
-        /// subtitle; accumulating measured heights keeps the layout clean at any scale while staying
-        /// pixel-identical to the original design at 100%.
+        /// 按 DPI 与实测字体高度布局，窄窗内仍可滚动访问全部控件。
         /// </summary>
         private void LayoutCard()
         {
-            int x = 28;
-            int y = 108;
-            _titleLabel.Location = new Point(x, y);
-            y += _titleLabel.Height + 2;
-            _subtitleLabel.Location = new Point(30, y);
-            y += _subtitleLabel.Height + 17;
-            _userLabel.Location = new Point(x, y);
-            y += _userLabel.Height + 7;
-            _userList.Location = new Point(x, y);
-            y += _userList.Height + 6;
-            _addUserLink.Location = new Point(x + 4, y);
-            y += _addUserLink.Height + 14;
-            _passwordLabel.Location = new Point(x, y);
-            y += _passwordLabel.Height + 7;
-            _passwordBox.Location = new Point(x, y);
-            y += Math.Max(_passwordBox.Height, _passwordBox.PreferredSize.Height) + 20;
-            _loginButton.Location = new Point(x, y);
-            _exitButton.Location = new Point(228, y);
-            y += _loginButton.Height + 14;
-            _hintLabel.Location = new Point(x, y);
-            y += _hintLabel.Height + 33;
-
-            _card.Size = new Size(440, Math.Max(560, y));
-            _clientSize = new Size(560, Math.Max(640, _card.Height + 80));
-            ClientSize = _clientSize;
+            if (_layingOut || _card == null || _card.ClientSize.Width < 100)
+            {
+                return;
+            }
+            _layingOut = true;
+            _card.SuspendLayout();
+            try
+            {
+                // Discard the previous scroll extent before shrinking the content width.
+                _card.AutoScrollMinSize = Size.Empty;
+                _card.AutoScrollPosition = Point.Empty;
+                int gap = Scale(12);
+                int x = Scale(32);
+                int width = Math.Max(Scale(220), _card.ClientSize.Width - x * 2 - SystemInformation.VerticalScrollBarWidth);
+                int y = Scale(32);
+                _titleLabel.Location = new Point(x, y);
+                y += _titleLabel.Height + gap;
+                _subtitleLabel.MaximumSize = new Size(width, 0);
+                _subtitleLabel.Location = new Point(x, y);
+                y += _subtitleLabel.Height + Scale(28);
+                _userLabel.Location = new Point(x, y);
+                y += _userLabel.Height + gap;
+                _userList.SetBounds(x, y, width, Scale(144));
+                _userList.ItemHeight = Scale(42);
+                y += _userList.Height + gap;
+                _addUserLink.Location = new Point(x, y);
+                y += _addUserLink.Height + Scale(24);
+                _passwordLabel.Location = new Point(x, y);
+                y += _passwordLabel.Height + gap;
+                _passwordBox.Location = new Point(x, y);
+                _passwordBox.Width = width;
+                y += _passwordBox.Height + Scale(24);
+                _loginButton.SetBounds(x, y, width, Scale(42));
+                y += _loginButton.Height + Scale(8);
+                _exitButton.SetBounds(x, y, width, Scale(36));
+                y += _exitButton.Height + Scale(20);
+                _hintLabel.MaximumSize = new Size(width, 0);
+                _hintLabel.Location = new Point(x, y);
+                _card.AutoScrollMinSize = new Size(0, _hintLabel.Bottom + Scale(28));
+            }
+            finally
+            {
+                _card.ResumeLayout(true);
+                _layingOut = false;
+            }
         }
 
-        /// <summary>
-        /// 卡片在壁纸上居中
-        /// </summary>
+        private int Scale(int value)
+        {
+            return (int)Math.Round(value * DeviceDpi / 96D);
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
             CenterCard();
         }
 
-        /// <summary>
-        /// 把登录卡片摆到客户区中央
-        /// </summary>
         private void CenterCard()
         {
-            if (_card == null)
+            if (_card == null || _artwork == null)
             {
                 return;
             }
-            _card.Location = new Point(
-                Math.Max(16, (ClientSize.Width - _card.Width) / 2),
-                Math.Max(16, (ClientSize.Height - _card.Height) / 2));
+            _artwork.Visible = ClientSize.Width >= Scale(780);
+            _artwork.Width = Math.Max(Scale(280), (int)(ClientSize.Width * 0.42));
+            LayoutCard();
         }
 
         /// <summary>
@@ -286,25 +304,43 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     e.Graphics.FillRectangle(hoverBrush, e.Bounds);
                 }
             }
-            string text = _userList.Items[e.Index]?.ToString() ?? string.Empty;
-            Rectangle textRect = new Rectangle(e.Bounds.X + 8, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
-            TextRenderer.DrawText(
-                e.Graphics,
-                text,
-                e.Font ?? _userList.Font,
-                textRect,
-                fore,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            UserBriefDto? user = e.Index < _users.Count ? _users[e.Index] : null;
+            int left = e.Bounds.X + Scale(14);
+            if (selected)
+            {
+                using (SolidBrush marker = new SolidBrush(ThemeManager.GetColor("accent")))
+                {
+                    e.Graphics.FillRectangle(marker, e.Bounds.X, e.Bounds.Y + Scale(8), Scale(3), e.Bounds.Height - Scale(16));
+                }
+            }
+            using (Font nameFont = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold))
+            using (Font metaFont = new Font("Microsoft YaHei UI", 8F))
+            {
+                string displayName = user?.DisplayName ?? _userList.Items[e.Index]?.ToString() ?? string.Empty;
+                string detail = user != null && user.LastLoginTime.HasValue
+                    ? "上次登录 " + user.LastLoginTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                    : "首次使用";
+                TextRenderer.DrawText(e.Graphics, displayName, nameFont, new Rectangle(left, e.Bounds.Y + Scale(3), e.Bounds.Width - Scale(24), Scale(20)), fore, TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(e.Graphics, detail, metaFont, new Rectangle(left, e.Bounds.Y + Scale(23), e.Bounds.Width - Scale(24), Scale(17)), ThemeManager.GetColor("textSecondary"), TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+            if ((e.State & DrawItemState.Focus) != 0)
+            {
+                e.DrawFocusRectangle();
+            }
         }
 
         /// <summary>
-        /// 句柄创建后的缩放可能改掉构造时的客户区；此时字体已按实际 DPI 定型，重排一次并钉回计算出的尺寸
+        /// 按当前屏幕工作区限制尺寸，再完成表单排版。
         /// </summary>
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            LayoutCard();
+            Rectangle workArea = Screen.FromControl(this).WorkingArea;
+            Size available = new Size(Math.Max(1, workArea.Width - Scale(32)), Math.Max(1, workArea.Height - Scale(48)));
+            MinimumSize = new Size(Math.Min(MinimumSize.Width, available.Width), Math.Min(MinimumSize.Height, available.Height));
+            Size = new Size(Math.Min(Width, available.Width), Math.Min(Height, available.Height));
             CenterCard();
+            _passwordBox.Focus();
         }
 
         /// <summary>
@@ -363,7 +399,7 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             string loginTime = user.LastLoginTime.HasValue
                 ? "上次登录 " + user.LastLoginTime.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
                 : "首次使用";
-            return user.DisplayName + "  (" + loginTime + ")";
+            return user.DisplayName + "  ·  " + loginTime;
         }
 
         /// <summary>
@@ -498,12 +534,22 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             _userList.Enabled = enabled;
             _passwordBox.Enabled = enabled;
             _exitButton.Enabled = enabled;
-            _loginButton.Text = enabled ? "登录" : "正在验证…";
+            _loginButton.Text = enabled ? "解锁档案" : "正在验证…";
+            _addUserLink.Enabled = enabled;
         }
 
         /// <summary>
-        /// 登录成功后切换到用户个人主题(主窗体加载时即为其偏好样式)
+        /// 释放防爆破倒计时资源。
         /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _countdownTimer?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
         private void ApplyUserTheme(int userId)
         {
             try

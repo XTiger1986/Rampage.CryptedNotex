@@ -1,34 +1,56 @@
 {
   "id": "contrast",
   "name": "高对比",
-  "description": "黑白金 · 最大可读性",
+  "description": "黑白金 · 清晰可读",
   "darkTitleBar": true,
+  "appearance": {
+    "motif": "contrast",
+    "styleName": "黑白金 · 清晰可读",
+    "buttonShape": "square"
+  },
   "colors": {
     "windowBack": "#000000",
-    "panelBack": "#0A0A0A",
-    "panelAltBack": "#141414",
-    "border": "#666666",
-    "inputBack": "#1A1A1A",
-    "inputBorder": "#888888",
+    "panelBack": "#000000",
+    "panelAltBack": "#000000",
+    "sidebarBack": "#000000",
+    "cardBack": "#000000",
+    "border": "#B2B2B2",
+    "inputBack": "#000000",
+    "inputBorder": "#B2B2B2",
     "text": "#FFFFFF",
-    "textSecondary": "#C8C8C8",
-    "accent": "#FFD700",
+    "textSecondary": "#D5D5D5",
+    "accent": "#FFE640",
     "accentText": "#000000",
-    "selectionBack": "#0045AD",
-    "pinnedMark": "#FFD700",
-    "trashTint": "#B08080",
-    "warning": "#FFD700",
-    "danger": "#FF6A5A",
-    "dangerText": "#000000",
-    "success": "#00D060",
-    "link": "#66D9FF",
+    "selectionBack": "#193E69",
+    "pinnedMark": "#FFE640",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#FFE640",
     "editorBack": "#000000",
     "editorText": "#FFFFFF",
-    "previewBack": "#0A0A0A"
+    "previewBack": "#000000"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.5 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 10.0 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 10
+    }
   },
-  "categoryPalette": [ "#FFD700", "#66D9FF", "#7CE38B", "#FF9E64", "#E8A2FF", "#8AE2FF", "#FFD23F", "#9FFF8A" ]
+  "categoryPalette": [
+    "#FFE640",
+    "#FFFFFF",
+    "#7DEBFF",
+    "#96F48D",
+    "#FFB084",
+    "#DBB0FF",
+    "#FFB3D0",
+    "#CBEFFF"
+  ]
 }

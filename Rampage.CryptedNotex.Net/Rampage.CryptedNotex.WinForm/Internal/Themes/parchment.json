@@ -1,34 +1,56 @@
 {
   "id": "parchment",
   "name": "羊皮纸",
-  "description": "暖黄纸感 · 灯下读写",
+  "description": "奶油纸页 · 灯下书房",
   "darkTitleBar": false,
+  "appearance": {
+    "motif": "parchment",
+    "styleName": "奶油纸页 · 灯下书房",
+    "buttonShape": "square"
+  },
   "colors": {
-    "windowBack": "#F3EAD8",
-    "panelBack": "#EAE0C9",
-    "panelAltBack": "#FAF4E6",
-    "border": "#D6C7A3",
-    "inputBack": "#FDFAF2",
-    "inputBorder": "#C9B98F",
-    "text": "#4A3F2A",
-    "textSecondary": "#6E6148",
-    "accent": "#8C6D3A",
-    "accentText": "#FDFAF2",
-    "selectionBack": "#E3D3AE",
-    "pinnedMark": "#A87C1F",
-    "trashTint": "#7E6045",
-    "warning": "#9C7421",
-    "danger": "#A94438",
+    "windowBack": "#EFE4CD",
+    "panelBack": "#E7D9BE",
+    "panelAltBack": "#F8F1E0",
+    "sidebarBack": "#E7D9BE",
+    "cardBack": "#F8F1E0",
+    "border": "#C6B496",
+    "inputBack": "#FFFAED",
+    "inputBorder": "#C6B496",
+    "text": "#453423",
+    "textSecondary": "#655137",
+    "accent": "#80582A",
+    "accentText": "#FFFFFF",
+    "selectionBack": "#E3CEAA",
+    "pinnedMark": "#80582A",
+    "trashTint": "#86403F",
+    "warning": "#805626",
+    "danger": "#B13338",
     "dangerText": "#FFFFFF",
-    "success": "#5F6F38",
-    "link": "#7A5C28",
-    "editorBack": "#FDFAF2",
-    "editorText": "#4A3F2A",
-    "previewBack": "#FDFAF2"
+    "success": "#286744",
+    "link": "#80582A",
+    "editorBack": "#FFFAED",
+    "editorText": "#453423",
+    "previewBack": "#FFFAED"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#8C6D3A", "#7A8C4E", "#A8553D", "#5E7A8C", "#8C5E7A", "#6E8C5E", "#8C7A4E", "#4E8C7A" ]
+  "categoryPalette": [
+    "#80582A",
+    "#8D493D",
+    "#6A7352",
+    "#7D667D",
+    "#527478",
+    "#997035",
+    "#7F664E",
+    "#675C52"
+  ]
 }

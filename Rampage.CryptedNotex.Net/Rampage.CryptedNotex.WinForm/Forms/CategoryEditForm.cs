@@ -1,4 +1,4 @@
-using Rampage.CryptedNotex.WinForm.Internal;
+﻿using Rampage.CryptedNotex.WinForm.Internal;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -34,24 +34,11 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(380, 156);
-
-            Label nameLabel = new Label
-            {
-                Text = "分类名",
-                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, 18)
-            };
-            Controls.Add(nameLabel);
-
-            _nameBox = new TextBox
-            {
-                Text = initialName,
-                Location = new Point(20, 42),
-                Size = new Size(340, 28),
-                Font = new Font("Microsoft YaHei UI", 10.5F)
-            };
+            ClientSize = new Size(440, 240);
+            DialogBody body = new DialogBody();
+            Controls.Add(body);
+            body.AddHeading(title);
+            _nameBox = new TextBox { Text = initialName, Font = new Font("Microsoft YaHei UI", 10.5F) };
             _nameBox.KeyDown += (sender, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
@@ -60,32 +47,18 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     Confirm();
                 }
             };
-            Controls.Add(_nameBox);
-
-            Button okButton = new Button
-            {
-                Text = "确定",
-                Tag = "theme:accent",
-                Location = new Point(20, 88),
-                Size = new Size(164, 36)
-            };
+            body.AddField("分类名", _nameBox);
+            FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            Button okButton = UiFactory.Button("保存分类", "theme:accent");
             okButton.Click += (sender, e) => Confirm();
-            Controls.Add(okButton);
+            Button cancelButton = UiFactory.Button("取消");
+            cancelButton.Click += (sender, e) => { DialogResult = DialogResult.Cancel; Close(); };
+            actions.Controls.Add(okButton);
+            actions.Controls.Add(cancelButton);
+            body.Add(actions);
             AcceptButton = okButton;
-
-            Button cancelButton = new Button
-            {
-                Text = "取消",
-                Location = new Point(196, 88),
-                Size = new Size(164, 36)
-            };
-            cancelButton.Click += (sender, e) =>
-            {
-                DialogResult = DialogResult.Cancel;
-                Close();
-            };
-            Controls.Add(cancelButton);
             CancelButton = cancelButton;
+            Shown += (sender, e) => { body.FitForm(this); _nameBox.Focus(); _nameBox.SelectAll(); };
         }
 
         /// <summary>

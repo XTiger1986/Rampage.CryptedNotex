@@ -1,6 +1,6 @@
 # 秘密档案（CryptedNotex）· 产品文档
 
-- 版本：v1.0（2026-10-24）
+- 版本：v1.1（2026-11-13，界面与主题规范更新）
 - 状态：设计定稿，随实现同步修订
 - 平台：Windows 10 1809+ / .NET 8 / WinForms / SQLite
 - 仓库：`D:\Studio\XTiger1986\Rampage.CryptedNotex`（解决方案 `Rampage.CryptedNotex.Net\Rampage.CryptedNotex.sln`）
@@ -87,7 +87,7 @@ Rampage.CryptedNotex.Net\
   Rampage.CryptedNotex.WinForm\
     Internal\                         NotexFormBase / CryptoSession / AutoLockManager / ThemeManager / NotexGuiContext / ServiceRefs
     Internal\Themes\                  Theme 模型 + 11 套内嵌主题 JSON
-    Assets\Chrome\                    金属纹理、壁纸、档案徽记（内嵌）
+    Assets\Chrome\                    应用图标、徽记及旧自定义主题兼容纹理（内嵌）
     Forms\                            登录/主窗体/各对话框
     Controls\                         编辑器与附件面板
     Assets\Markdown\                  marked/highlight.js 本地资源
@@ -219,16 +219,17 @@ Rampage.CryptedNotex.Net\
 
 ### 4.8 主题系统
 
-- JSON 主题：`id/name/description(一句身份描述)/darkTitleBar/colors(21 键,含 dangerText、success)/fonts(categoryPalette 8 色板)`，可选 `chrome`（`metal` none/silver/black、`wallpaper`、`glow`）（Schema 见附录）；
-- `fonts.ui`（窗体基础字体）与 `fonts.listTitle`（列表字体）随主题应用；全部颜色配对（文字/底色、按钮、链接、回收站行、提示条）按 WCAG AA ≥4.5 校验通过；
-- 内嵌扁平 6 套：light 浅色 / dark 深色 / forest 墨绿 / parchment 羊皮纸 / violet 紫罗兰 / contrast 高对比；
-- 内嵌金属 5 套：invader 入侵者 / alienmorph 异形形态 / darkstar 暗星 / alx ALX / xenomorph 异形。新用户与尚未写入的全局默认主题为 xenomorph；已保存的偏好不改；
-- 金属主题用原创徽记、拉丝底和壁纸（不使用第三方外壳商标）。编辑器正文区仍是纯色，壁纸只出现在窗体边缘和登录底；
+- JSON 主题包含 `id/name/description/darkTitleBar/colors/fonts/categoryPalette`，新增可选 `appearance`（图形身份、描述、按钮轮廓）；旧自定义主题的 `chrome` 配置仍兼容；
+- `fonts.ui`（窗体基础字体）与 `fonts.listTitle`（列表字体）随主题应用；内置主题的文字/底色、按钮、链接、选中行、侧栏、卡片及提示标题按 WCAG AA ≥4.5 校验；
+- 保留全部 11 套主题及原 ID：light 浅色 / dark 深色 / forest 墨绿 / parchment 羊皮纸 / violet 紫罗兰 / contrast 高对比 / invader 入侵者 / alienmorph 异形形态 / darkstar 暗星 / alx ALX / xenomorph 异形。新用户与尚未写入的全局默认主题为 xenomorph；已保存的偏好不改；
+- 每套主题拥有独立配色、矢量身份图形与按钮轮廓；插画集中在登录侧区、主侧栏和主题画廊，正文保留安静纸面。富文本保留作者的文字颜色与稳定纸张；
 - exe 旁 `themes\*.json` 按 id 覆盖或追加自定义主题；
 - 登录前使用全局默认主题（setting 表），登录后读取个人偏好；实时切换（暗色标题栏 DWM 双向处理，暗→亮会写回浅色）；
 - Markdown 预览画布按 `previewBack` 亮度自动选明暗 CSS，并把画布底/正文色着色为主题家族色；
 - 暗色主题的系统滚动条与下拉切到 DarkMode_Explorer 资源，浅色切回默认；
 - 分类色：色板按分类序号取模，用于侧栏色点与列表标记。
+
+主题身份表、颜色令牌、扩展 API 和对比度脚本见[前端设计文档](../FrontendDesign/CryptedNotex.FrontendDesign.md)。
 
 ### 4.9 设置
 
@@ -298,9 +299,9 @@ Rampage.CryptedNotex.Net\
 
 ### 6.4 视觉
 
-登录与首运行是壁纸上的金属卡片，顶部为档案徽记和「秘密档案」。主窗体三栏外留一圈壁纸；侧栏为金属品牌条、分类色点和绘制的锁；列表行自绘（置顶菱形、选中光）。扁平主题不加载壁纸，只换配色。
+登录与创建账户采用主题插画与表单双区布局，窄窗口隐藏插画并允许表单滚动。主窗体保留分类、笔记列表、编辑器三栏，加入独立主题身份区、整行笔记摘要、大标题和清晰的阅读/编辑入口。设置窗用三栏工作区微缩预览展示 11 套主题，旁侧集中编辑与安全偏好。
 
-交互光影语言：「光」是界面的反馈动词——悬停点亮辉光（金属主题普通按钮悬停时边缘亮起主题辉光，强调按钮辉光加粗），按下时光熄灭下沉；列表行悬停有选中色洗版高亮；输入框聚焦时底色向强调色轻微混合。设置窗主题画廊为富预览卡片（壁纸条 + 名称 + 一句身份描述 + 三色点），点击即时全窗体生效。
+主题以纸白网格、松林叶片、暖纸叠页、雷达、流体、建筑、星轨和机械脊线等图形形成区别。按钮按主题采用圆角、方形或切角，提供悬停、按下、禁用、键盘焦点及格式启用反馈。正文不铺装饰纹理；富文本不因换主题重新着色或序列化。现行布局、DPI 基线、视觉身份和兼容规则见[前端设计文档](../FrontendDesign/CryptedNotex.FrontendDesign.md)。
 
 ---
 
@@ -315,32 +316,11 @@ Rampage.CryptedNotex.Net\
 
 ## 8. 附录
 
-### 8.1 主题 JSON Schema（示例）
+### 8.1 主题 JSON 与兼容
 
-```jsonc
-{
-  "id": "dark",
-  "name": "深色",
-  "darkTitleBar": true,
-  "colors": {
-    "windowBack": "#1E1E1E", "panelBack": "#252526", "panelAltBack": "#2D2D30",
-    "border": "#3F3F46", "inputBack": "#333333", "inputBorder": "#3C3C3C",
-    "text": "#F0F0F0", "textSecondary": "#A0A0A0",
-    "accent": "#007ACC", "accentText": "#FFFFFF", "selectionBack": "#094771",
-    "pinnedMark": "#FFB900", "trashTint": "#5A3A3A",
-    "warning": "#D7BA7D", "danger": "#F14C4C", "link": "#4EC9B0",
-    "editorBack": "#1E1E1E", "editorText": "#D4D4D4", "previewBack": "#FFFFFF"
-  },
-  "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
-  },
-  "categoryPalette": ["#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8", "#9661BC", "#F6903D", "#008685"],
-  "chrome": { "metal": "black", "wallpaper": "xenomorph", "glow": "#3EC6FF" }
-}
-```
+字段说明与扩展 API 统一维护在[前端设计文档 §2](../FrontendDesign/CryptedNotex.FrontendDesign.md#2-主题令牌和-api)，完整示例以[内置浅色主题](../../Rampage.CryptedNotex.Net/Rampage.CryptedNotex.WinForm/Internal/Themes/light.json)为准。
 
-`chrome` 可省略。`metal` 为 `none` 时与旧主题一样只铺纯色。
+基础 21 色键继续沿用；新增 sidebarBack / cardBack 分别回退 panelBack / panelAltBack。appearance 可省略，chrome 保留旧主题加载兼容。主题外观字段不写入笔记，也不要求数据库迁移。提交新配色须运行前端目录的 contrast-audit.ps1 并通过全部文字对比配对。
 
 ### 8.2 FAQ
 

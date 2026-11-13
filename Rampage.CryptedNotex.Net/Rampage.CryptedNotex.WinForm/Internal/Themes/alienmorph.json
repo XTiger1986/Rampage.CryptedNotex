@@ -1,35 +1,56 @@
 {
   "id": "alienmorph",
   "name": "异形形态",
-  "description": "拉丝银 · 靛蓝机库",
+  "description": "珠紫流体 · 有机曲面",
   "darkTitleBar": false,
-  "chrome": { "metal": "silver", "wallpaper": "alienmorph", "glow": "#7DD3FC" },
+  "appearance": {
+    "motif": "alienmorph",
+    "styleName": "珠紫流体 · 有机曲面",
+    "buttonShape": "rounded"
+  },
   "colors": {
-    "windowBack": "#F3F6FA",
-    "panelBack": "#FFFFFF",
-    "panelAltBack": "#F7F9FC",
-    "border": "#D5DDE6",
-    "inputBack": "#FFFFFF",
-    "inputBorder": "#D0D7E0",
-    "text": "#1E293B",
-    "textSecondary": "#5B6B7F",
-    "accent": "#3D5FD0",
+    "windowBack": "#EEEAF7",
+    "panelBack": "#E4DFF2",
+    "panelAltBack": "#F8F5FD",
+    "sidebarBack": "#E4DFF2",
+    "cardBack": "#F8F5FD",
+    "border": "#BEB0D5",
+    "inputBack": "#FCFAFF",
+    "inputBorder": "#BEB0D5",
+    "text": "#3A2853",
+    "textSecondary": "#644B77",
+    "accent": "#704393",
     "accentText": "#FFFFFF",
-    "selectionBack": "#E0EFFF",
-    "pinnedMark": "#B45309",
-    "trashTint": "#B45454",
-    "warning": "#A16207",
-    "danger": "#DC2626",
+    "selectionBack": "#DBCAED",
+    "pinnedMark": "#704393",
+    "trashTint": "#86403F",
+    "warning": "#805626",
+    "danger": "#B13338",
     "dangerText": "#FFFFFF",
-    "success": "#157F5B",
-    "link": "#2563EB",
-    "editorBack": "#FAFAF6",
-    "editorText": "#1E293B",
-    "previewBack": "#FAFAF6"
+    "success": "#286744",
+    "link": "#704393",
+    "editorBack": "#FCFAFF",
+    "editorText": "#3A2853",
+    "previewBack": "#FCFAFF"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#3D5FD0", "#06B6D4", "#8B5CF6", "#10B981", "#F59E0B", "#EC4899", "#64748B", "#0EA5E9" ]
+  "categoryPalette": [
+    "#704393",
+    "#957046",
+    "#516DA5",
+    "#906080",
+    "#537E78",
+    "#7C673E",
+    "#7B6A9B",
+    "#766477"
+  ]
 }

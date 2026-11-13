@@ -21,9 +21,9 @@ namespace Rampage.CryptedNotex.WinForm.Internal
                 Text = text,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                MinimumSize = new Size(0, 32),
+                MinimumSize = new Size(0, 36),
                 Margin = new Padding(4, 4, 4, 4),
-                Padding = new Padding(10, 3, 10, 3),
+                Padding = new Padding(10, 4, 10, 4),
                 UseVisualStyleBackColor = false
             };
             if (!string.IsNullOrEmpty(themeTag))

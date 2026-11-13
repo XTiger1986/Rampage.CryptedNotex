@@ -21,6 +21,29 @@ namespace Rampage.CryptedNotex.WinForm.Controls
         protected const int AUTOSAVE_DELAY_MS = 2000;
 
         private Timer? _autosaveTimer;
+        private bool _designScaleApplied;
+
+        /// <summary>
+        /// 编辑器在主窗口显示后按需创建，使用与窗体一致的 DPI 缩放方式。
+        /// </summary>
+        protected NoteEditorBase()
+        {
+            AutoScaleMode = AutoScaleMode.Dpi;
+        }
+
+        /// <summary>
+        /// 派生类控件树构建后再应用 96 DPI 设计基线，避免动态创建的工具条保持逻辑像素尺寸。
+        /// </summary>
+        protected override void OnLoad(EventArgs e)
+        {
+            if (!_designScaleApplied)
+            {
+                _designScaleApplied = true;
+                AutoScaleDimensions = new SizeF(96F, 96F);
+                PerformAutoScale();
+            }
+            base.OnLoad(e);
+        }
 
         /// <summary>
         /// 当前编辑的笔记详情

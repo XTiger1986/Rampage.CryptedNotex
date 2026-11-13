@@ -16,6 +16,7 @@ namespace Rampage.CryptedNotex.WinForm.Internal
         private ToastHost? _toasts;
         private BusyBanner? _busyBanner;
         private int _busyDepth;
+        private bool _designScaleApplied;
 
         /// <summary>
         /// 应用上下文
@@ -126,6 +127,15 @@ namespace Rampage.CryptedNotex.WinForm.Internal
         /// </summary>
         protected override void OnLoad(EventArgs e)
         {
+            // Programmatic forms build their control tree after the base constructor.
+            // Establish the design baseline here so the initial font assignment cannot
+            // consume the scale before those controls exist.
+            if (!_designScaleApplied)
+            {
+                _designScaleApplied = true;
+                AutoScaleDimensions = new SizeF(96F, 96F);
+                PerformAutoScale();
+            }
             EnsureChrome();
             base.OnLoad(e);
             Themes.ThemeManager.Apply(this);

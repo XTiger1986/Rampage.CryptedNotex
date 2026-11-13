@@ -62,6 +62,26 @@ namespace Rampage.CryptedNotex.WinForm.Internal.Themes
         /// 金属质感与壁纸。缺省或 metal=none 时保持扁平上色。
         /// </summary>
         public ThemeChrome? Chrome { get; set; }
+
+        /// <summary>
+        /// 可选视觉身份。旧版自定义主题可省略，自动采用相应 id 的图形和默认按钮形状。
+        /// </summary>
+        public ThemeAppearance? Appearance { get; set; }
+    }
+
+    /// <summary>
+    /// 仅用于绘制的主题属性，不参与用户数据存储。
+    /// </summary>
+    public sealed class ThemeAppearance
+    {
+        public string Motif { get; set; } = string.Empty;
+
+        public string StyleName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// rounded / square / cut。
+        /// </summary>
+        public string ButtonShape { get; set; } = "rounded";
     }
 
     /// <summary>

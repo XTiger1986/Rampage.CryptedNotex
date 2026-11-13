@@ -1,34 +1,56 @@
 {
   "id": "light",
   "name": "浅色",
-  "description": "明亮纸白 · 日常办公",
+  "description": "明亮纸白 · 编辑秩序",
   "darkTitleBar": false,
+  "appearance": {
+    "motif": "light",
+    "styleName": "明亮纸白 · 编辑秩序",
+    "buttonShape": "rounded"
+  },
   "colors": {
-    "windowBack": "#F5F6F8",
-    "panelBack": "#EDEFF2",
+    "windowBack": "#F1F4F9",
+    "panelBack": "#EAF0F8",
     "panelAltBack": "#FFFFFF",
-    "border": "#DCDEE2",
+    "sidebarBack": "#EAF0F8",
+    "cardBack": "#FFFFFF",
+    "border": "#CBD5E3",
     "inputBack": "#FFFFFF",
-    "inputBorder": "#CCCCCC",
-    "text": "#202226",
-    "textSecondary": "#5F6873",
-    "accent": "#007ACC",
+    "inputBorder": "#CBD5E3",
+    "text": "#22334B",
+    "textSecondary": "#56677F",
+    "accent": "#245BB8",
     "accentText": "#FFFFFF",
-    "selectionBack": "#CCE4F3",
-    "pinnedMark": "#BF9000",
-    "trashTint": "#856565",
-    "warning": "#9C7421",
-    "danger": "#C83C34",
+    "selectionBack": "#DCE8FC",
+    "pinnedMark": "#245BB8",
+    "trashTint": "#8C4544",
+    "warning": "#805626",
+    "danger": "#B13338",
     "dangerText": "#FFFFFF",
-    "success": "#267A54",
-    "link": "#0066AA",
-    "editorBack": "#FAFAF6",
-    "editorText": "#202226",
-    "previewBack": "#FAFAF6"
+    "success": "#286744",
+    "link": "#245BB8",
+    "editorBack": "#FFFFFF",
+    "editorText": "#24324A",
+    "previewBack": "#FFFFFF"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8", "#9661BC", "#F6903D", "#008685" ]
+  "categoryPalette": [
+    "#245BB8",
+    "#46729C",
+    "#33775B",
+    "#987235",
+    "#8362A2",
+    "#407E87",
+    "#A45A51",
+    "#596477"
+  ]
 }

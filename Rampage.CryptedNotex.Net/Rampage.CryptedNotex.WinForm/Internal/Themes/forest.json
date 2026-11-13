@@ -1,34 +1,56 @@
 {
   "id": "forest",
   "name": "墨绿",
-  "description": "沉静墨绿 · 暗夜护眼",
+  "description": "深松苔绿 · 林间手记",
   "darkTitleBar": true,
+  "appearance": {
+    "motif": "forest",
+    "styleName": "深松苔绿 · 林间手记",
+    "buttonShape": "rounded"
+  },
   "colors": {
-    "windowBack": "#1B2621",
-    "panelBack": "#222F28",
-    "panelAltBack": "#28362E",
-    "border": "#3A4A40",
-    "inputBack": "#2E3D34",
-    "inputBorder": "#42544A",
-    "text": "#E4EDE7",
-    "textSecondary": "#9CAFA4",
-    "accent": "#4CAF7D",
-    "accentText": "#0E1512",
-    "selectionBack": "#2E5A42",
-    "pinnedMark": "#D9B85C",
-    "trashTint": "#BFA093",
-    "warning": "#D9B85C",
-    "danger": "#BC4F3D",
-    "dangerText": "#FFFFFF",
-    "success": "#7CCBA0",
-    "link": "#7CCBA0",
-    "editorBack": "#1B2621",
-    "editorText": "#D6E3DB",
-    "previewBack": "#1B2621"
+    "windowBack": "#14251F",
+    "panelBack": "#1B3027",
+    "panelAltBack": "#172B23",
+    "sidebarBack": "#1B3027",
+    "cardBack": "#172B23",
+    "border": "#3D5747",
+    "inputBack": "#20372C",
+    "inputBorder": "#3D5747",
+    "text": "#EEF1DE",
+    "textSecondary": "#BAC8AF",
+    "accent": "#C3D597",
+    "accentText": "#1B2C16",
+    "selectionBack": "#36513C",
+    "pinnedMark": "#C3D597",
+    "trashTint": "#E7B5AD",
+    "warning": "#EAC57D",
+    "danger": "#F2A79F",
+    "dangerText": "#321311",
+    "success": "#B6D8A6",
+    "link": "#C3D597",
+    "editorBack": "#18291F",
+    "editorText": "#EEF1DE",
+    "previewBack": "#18291F"
   },
   "fonts": {
-    "ui": { "family": "Microsoft YaHei UI", "size": 9.0 },
-    "listTitle": { "family": "Microsoft YaHei UI", "size": 9.5 }
+    "ui": {
+      "family": "Microsoft YaHei UI",
+      "size": 9
+    },
+    "listTitle": {
+      "family": "Microsoft YaHei UI",
+      "size": 9.5
+    }
   },
-  "categoryPalette": [ "#4CAF7D", "#8FC93A", "#2D8F8A", "#C9A227", "#5F9EA0", "#77A156", "#3E8E5A", "#A3C9A8" ]
+  "categoryPalette": [
+    "#C3D597",
+    "#B7A779",
+    "#8DC6A6",
+    "#D7BF99",
+    "#C7B7BD",
+    "#92BEB8",
+    "#C9CCAB",
+    "#AAA984"
+  ]
 }

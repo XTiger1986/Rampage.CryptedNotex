@@ -1,4 +1,4 @@
-using Rampage.CryptedNotex.WinForm.Internal;
+﻿using Rampage.CryptedNotex.WinForm.Internal;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -43,40 +43,17 @@ namespace Rampage.CryptedNotex.WinForm.Forms
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
 
-            int y = 20;
+            ClientSize = new Size(470, 340);
+            DialogBody body = new DialogBody();
+            Controls.Add(body);
+            body.AddHeading(title);
             if (!string.IsNullOrEmpty(message))
             {
-                Label messageLabel = new Label
-                {
-                    Text = message,
-                    Tag = "theme:muted",
-                    AutoSize = true,
-                    MaximumSize = new Size(380, 0),
-                    Location = new Point(20, y)
-                };
-                Controls.Add(messageLabel);
-                y = messageLabel.Bottom + 12;
+                body.AddHelp(message);
             }
-
             foreach (string label in fieldLabels)
             {
-                Label fieldLabel = new Label
-                {
-                    Text = label,
-                    Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
-                    AutoSize = true,
-                    Location = new Point(20, y)
-                };
-                Controls.Add(fieldLabel);
-                y += 22;
-
-                TextBox box = new TextBox
-                {
-                    Location = new Point(20, y),
-                    Size = new Size(372, 28),
-                    Font = new Font("Microsoft YaHei UI", 10.5F),
-                    UseSystemPasswordChar = true
-                };
+                TextBox box = new TextBox { Font = new Font("Microsoft YaHei UI", 10.5F), UseSystemPasswordChar = true };
                 int index = _boxes.Count;
                 box.KeyDown += (sender, e) =>
                 {
@@ -94,36 +71,19 @@ namespace Rampage.CryptedNotex.WinForm.Forms
                     }
                 };
                 _boxes.Add(box);
-                Controls.Add(box);
-                y += 40;
+                body.AddField(label, box);
             }
-
-            Button okButton = new Button
-            {
-                Text = "确定",
-                Tag = "theme:accent",
-                Location = new Point(20, y + 6),
-                Size = new Size(180, 36)
-            };
+            FlowLayoutPanel actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            Button okButton = UiFactory.Button("确定", "theme:accent");
             okButton.Click += (sender, e) => Confirm();
-            Controls.Add(okButton);
+            Button cancelButton = UiFactory.Button("取消");
+            cancelButton.Click += (sender, e) => { DialogResult = DialogResult.Cancel; Close(); };
+            actions.Controls.Add(okButton);
+            actions.Controls.Add(cancelButton);
+            body.Add(actions);
             AcceptButton = okButton;
-
-            Button cancelButton = new Button
-            {
-                Text = "取消",
-                Location = new Point(212, y + 6),
-                Size = new Size(180, 36)
-            };
-            cancelButton.Click += (sender, e) =>
-            {
-                DialogResult = DialogResult.Cancel;
-                Close();
-            };
-            Controls.Add(cancelButton);
             CancelButton = cancelButton;
-
-            ClientSize = new Size(412, y + 58);
+            Shown += (sender, e) => { body.FitForm(this); _boxes[0].Focus(); };
         }
 
         /// <summary>
